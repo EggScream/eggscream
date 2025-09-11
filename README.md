@@ -1,16 +1,15 @@
-## A nonsense monument , built by the internet 1$ at a time
+# 🐔 EggScream
 
-<!--
-**EggScream/eggscream** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+**$1 = One Egg. One Scream.**  
+The dumbest dollar you’ll ever spend.
 
-Here are some ideas to get you started:
+---
 
-- 🔭 I’m currently working on ...
-- 🌱 I’m currently learning ...
-- 👯 I’m looking to collaborate on ...
-- 🤔 I’m looking for help with ...
-- 💬 Ask me about ...
-- 📫 How to reach me: ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
--->
+## What is this?
+Pay $1 → the chicken screams.  
+Every egg stays forever.  
+A nonsense Internet monument.  
+
+---
+
+![EggScream](og.png)
