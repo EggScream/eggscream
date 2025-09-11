@@ -299,8 +299,10 @@ h1{margin:0;font-size:22px; line-height:1}
       <p>💥 Warning: This $1 will make a chicken scream.</p>
       <div class="payBtns">
         <!-- Stripe: Payment Link -->
-        <a href="https://buy.stripe.com/YOUR_STRIPE_LINK?success=1"
-           class="payBtn stripe" target="_blank" rel="noopener">💳 Pay with Stripe</a>
+        <a href="https://buy.stripe.com/IL_TUO_LINK?success=1"
+   class="payBtn stripe" target="_blank" rel="noopener"
+   onclick="markPaymentIntent()">💳 Pay with Stripe</a>
+
 
         <!-- PayPal: container per Smart Buttons -->
         <div id="paypalButtons"></div>
@@ -582,6 +584,7 @@ async function runPostPaymentFlow() {
 
 </body>
 </html>
+
 
 
 
