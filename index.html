@@ -475,111 +475,98 @@ function layEgg(){
   render();
   syncNestVisual(localEggs);
 })();
+  
+<!-- PATCH POST-PAYMENT ROBUSTA -->
+<script>
+// Marca che stai per pagare (se vuoi usarlo sul bottone Stripe)
+function markPaymentIntent() {
+  try { localStorage.setItem('eggscream_pending_payment', '1'); } catch(e) {}
+}
 
-/* POST-PAGAMENTO (Stripe/PayPal): aggiungi uovo, aggiorna contatore, gestisci audio in sicurezza */
-(() => {
-  const qs = new URLSearchParams(window.location.search);
-  const paid =
-    qs.get('success') === '1' ||                 // tuo vecchio schema (PayPal)
-    qs.get('redirect_status') === 'succeeded';   // schema Stripe Payment Links
+// Riconosci ritorno dal pagamento
+function detectPaidReturn() {
+  try {
+    const urlOK = window.location.search.includes('success=1');
+    const refOK = document.referrer.includes('stripe.com') || document.referrer.includes('paypal.com');
+    const flagOK = localStorage.getItem('eggscream_pending_payment') === '1';
+    console.log('[EggScream] detectPaidReturn', { urlOK, refOK, flagOK, ref: document.referrer, qs: window.location.search });
+    return urlOK || refOK || flagOK;
+  } catch(e) { return false; }
+}
 
-  if (!paid) return;
+// Esegui post-pagamento
+async function runPostPaymentFlow() {
+  console.log('[EggScream] runPostPaymentFlow: start');
 
-  (async () => {
-    // prova ad aggiornare il contatore globale; se fallisce, incrementa almeno in locale
-    let newVal = null;
-    try { newVal = await hitCounter(); } catch(_) {}
-    if (Number.isFinite(newVal)) localEggs = newVal; else localEggs = (localEggs||0) + 1;
-    render();
-
-    // aggiungi l’uovo subito e sincronizza la griglia
-    addEgg();
-    syncNestVisual(localEggs);
-
-    // prova a fare "plop" se l'audio è consentito; altrimenti mostra CTA per sbloccarlo
-    if (audioCtx && audioCtx.state === 'running') {
-      tryPlop(); showRubber();
+  // 1) Prova ad aggiornare il contatore globale
+  let hitOk = false;
+  try {
+    const newVal = await hitCounter().catch(()=>null);
+    if (newVal !== null) {
+      localEggs = newVal;
+      render();
+      hitOk = true;
+      console.log('[EggScream] hitCounter OK:', newVal);
     } else {
-      const cta = document.createElement('button');
-      cta.textContent = 'Tap to celebrate 🎉🐔';
-      cta.className = 'miniBtn';
-      cta.style.marginTop = '10px';
-      document.querySelector('.controls').appendChild(cta);
-
-      function celebrate(){
-        if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-        if(audioCtx.state==='suspended') audioCtx.resume();
-        cluck(); setTimeout(plop,140); showRubber();
-        cta.remove(); document.removeEventListener('pointerdown', celebrateOnce, true);
-      }
-      const celebrateOnce = () => celebrate();
-      cta.addEventListener('click', celebrate);
-      document.addEventListener('pointerdown', celebrateOnce, true);
+      console.warn('[EggScream] hitCounter returned null');
     }
-
-    // pulisci la query string
-    history.replaceState({}, document.title, window.location.pathname);
-    lastEl.textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  })();
-})();
-
-/* Manifesto open/close + ESC + click fuori */
-function showManifesto(){ backMan.style.display='flex'; closeMan.focus(); }
-function hideManifesto(){ backMan.style.display='none'; }
-openMan.addEventListener('click', (e)=>{ e.preventDefault(); showManifesto(); });
-closeMan.addEventListener('click', hideManifesto);
-backMan.addEventListener('click', (e)=>{ if(e.target===backMan) hideManifesto(); });
-window.addEventListener('keydown', (e)=>{ if(e.key==='Escape') hideManifesto(); });
-
-/* Share on X */
-const shareX = document.getElementById('shareX');
-if(shareX){
-  const text = "I made the chicken scream 🐔 for $1. Join the dumbest monument on the internet";
-  const url  = window.location.origin;
-  shareX.href = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(text) +
-                "&url=" + encodeURIComponent(url);
-}
-
-/* --- Fallback CSS: se hash è #payModal, carica PayPal in lazy --- */
-function maybeInitPayPal(){
-  const container = document.getElementById('paypalButtons');
-  if (container && !container.hasChildNodes()) {
-    renderPayPalButtons().catch(()=>{});
+  } catch (e) {
+    console.warn('[EggScream] hitCounter error:', e);
   }
-}
-window.addEventListener('hashchange', ()=>{ if(location.hash==='#payModal') maybeInitPayPal(); });
-if(location.hash==='#payModal') maybeInitPayPal();
 
-/* PayPal SDK lazy-load + render */
-let paypalLoaded = false;
-function loadPayPalSDK(){
-  return new Promise((resolve,reject)=>{
-    if (paypalLoaded && window.paypal) return resolve();
-    const s = document.createElement('script');
-    s.src = "https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=USD&intent=capture";
-    s.onload = ()=>{ paypalLoaded = true; resolve(); };
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
+  // 2) Aggiungi SEMPRE almeno un uovo in UI (anche se CountAPI non risponde)
+  try {
+    const prevCtx = audioCtx;
+    audioCtx = null;           // evita blocco audio auto
+    addEgg();
+    syncNestVisual(localEggs); // mantiene coerenza 7x7 + badge
+    audioCtx = prevCtx;
+    console.log('[EggScream] addEgg() called');
+  } catch (e) {
+    console.error('[EggScream] addEgg() failed:', e);
+  }
+
+  // 3) CTA per sbloccare i suoni su iOS
+  try {
+    const cta = document.createElement('button');
+    cta.textContent = 'Tap to celebrate 🎉🐔';
+    cta.className = 'miniBtn';
+    cta.style.marginTop = '10px';
+    document.querySelector('.controls').appendChild(cta);
+
+    function celebrate(){
+      if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      if(audioCtx.state==='suspended') audioCtx.resume();
+      cluck(); setTimeout(plop,140); showRubber();
+      cta.remove(); document.removeEventListener('pointerdown', celebrateOnce, true);
+    }
+    cta.addEventListener('click', celebrate);
+    function celebrateOnce(){ celebrate(); }
+    document.addEventListener('pointerdown', celebrateOnce, true);
+    console.log('[EggScream] CTA inserted');
+  } catch (e) {
+    console.warn('[EggScream] CTA insert failed:', e);
+  }
+
+  // 4) Pulizia URL e flag
+  try {
+    history.replaceState({}, document.title, window.location.pathname);
+    localStorage.removeItem('eggscream_pending_payment');
+    lastEl.textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    console.log('[EggScream] cleanup done');
+  } catch(e) {}
+
+  console.log('[EggScream] runPostPaymentFlow: end');
 }
-async function renderPayPalButtons(){
-  await loadPayPalSDK();
-  window.paypal.Buttons({
-    style: { layout:'vertical', color:'gold', shape:'pill', label:'pay' },
-    createOrder: (data, actions) => {
-      return actions.order.create({
-        purchase_units: [{ amount: { value: '1.00' } }]
-      });
-    },
-    onApprove: (data, actions) => {
-      return actions.order.capture().then(()=>{
-        window.location.href = window.location.pathname + '?success=1';
-      });
-    },
-    onCancel: () => {},
-    onError: (err) => { console.error('PayPal error', err); }
-  }).render('#paypalButtons');
-}
+
+// Avvia il flusso se rileviamo ritorno pagato
+(function bootPaid() {
+  const paid = detectPaidReturn();
+  console.log('[EggScream] paid return?', paid);
+  if (paid) {
+    runPostPaymentFlow();
+  }
+})();
 </script>
 
 <!-- Analytics Plausible -->
@@ -609,6 +596,7 @@ async function renderPayPalButtons(){
 
 </body>
 </html>
+
 
 
 
