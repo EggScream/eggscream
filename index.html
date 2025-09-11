@@ -478,55 +478,45 @@ function layEgg(){
   syncNestVisual(localEggs);
 })();
   
-<!-- PATCH POST-PAYMENT ROBUSTA -->
+<!-- POST-PAYMENT PATCH SEMPLICE E ROBUSTA -->
 <script>
-// Marca che stai per pagare (se vuoi usarlo sul bottone Stripe)
-function markPaymentIntent() {
-  try { localStorage.setItem('eggscream_pending_payment', '1'); } catch(e) {}
-}
-
-// Riconosci ritorno dal pagamento
-function detectPaidReturn() {
+// Incrementa contatore globale; se fallisce, fallback +1 locale
+async function bumpEggsSafely() {
   try {
-    const urlOK = window.location.search.includes('success=1');
-    const refOK = document.referrer.includes('stripe.com') || document.referrer.includes('paypal.com');
-    const flagOK = localStorage.getItem('eggscream_pending_payment') === '1';
-    console.log('[EggScream] detectPaidReturn', { urlOK, refOK, flagOK, ref: document.referrer, qs: window.location.search });
-    return urlOK || refOK || flagOK;
-  } catch(e) { return false; }
-}
-
-// Esegui post-pagamento
-<script>
-async function runPostPaymentFlow() {
-  console.log('[EggScream] runPostPaymentFlow: start');
-
-  // 1) Prova ad aggiornare il contatore globale
-  let newVal = null;
-  try { newVal = await hitCounter().catch(() => null); } catch (e) {}
-  if (Number.isFinite(newVal)) {
-    localEggs = newVal;               // contatore globale OK
-  } else {
-    localEggs = (localEggs || 0) + 1; // fallback: almeno +1 locale
+    const newVal = await hitCounter().catch(() => null);
+    if (Number.isFinite(newVal)) {
+      localEggs = newVal;
+    } else {
+      localEggs = (localEggs || 0) + 1;
+    }
+  } catch (e) {
+    localEggs = (localEggs || 0) + 1;
   }
   render();
+}
 
-  // 2) Aggiorna subito la UI e allinea la griglia
+async function runPostPaymentFlow() {
+  console.log('[EggScream] Post-payment start');
+
+  // 1) incrementa contatore (globale o fallback)
+  await bumpEggsSafely();
+
+  // 2) aggiorna UI uova in modo coerente
   try {
     const prevCtx = audioCtx;
-    audioCtx = null;           // evita blocchi audio auto
-    addEgg();                  // uovo visivo immediato
-    syncNestVisual(localEggs); // ora usa il valore già incrementato
+    audioCtx = null;           // evita problemi audio auto
+    addEgg();                  // uovo visivo
+    syncNestVisual(localEggs); // usa il valore già incrementato
     audioCtx = prevCtx;
-    console.log('[EggScream] egg added & grid synced ->', localEggs);
   } catch (e) {
-    console.error('[EggScream] addEgg/sync failed:', e);
+    console.error('[EggScream] UI egg add failed:', e);
   }
 
-  // 3) Se l’audio è già sbloccato, fai un “plop”+rubber; altrimenti CTA
+  // 3) suoni: se già sbloccati plop+rubber, altrimenti CTA "Tap to celebrate"
   try {
     if (audioCtx && audioCtx.state === 'running') {
-      tryPlop(); showRubber();
+      try { plop(); } catch(e) {}
+      showRubber();
     } else {
       const cta = document.createElement('button');
       cta.textContent = 'Tap to celebrate 🎉🐔';
@@ -534,28 +524,44 @@ async function runPostPaymentFlow() {
       cta.style.marginTop = '10px';
       document.querySelector('.controls').appendChild(cta);
 
-      function celebrate() {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        cluck(); setTimeout(plop, 140); showRubber();
+      function celebrate(){
+        if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+        if(audioCtx.state==='suspended') audioCtx.resume();
+        cluck(); setTimeout(plop,140); showRubber();
         cta.remove(); document.removeEventListener('pointerdown', celebrateOnce, true);
       }
       const celebrateOnce = () => celebrate();
       cta.addEventListener('click', celebrate);
       document.addEventListener('pointerdown', celebrateOnce, true);
     }
-  } catch (e) {}
+  } catch(e){}
 
-  // 4) Pulizia URL e flag
+  // 4) pulizia URL e flag
   try {
     history.replaceState({}, document.title, window.location.pathname);
     localStorage.removeItem('eggscream_pending_payment');
-    lastEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  } catch (e) {}
+    lastEl.textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  } catch(e){}
 
-  console.log('[EggScream] runPostPaymentFlow: end');
+  console.log('[EggScream] Post-payment done. localEggs=', localEggs);
 }
+
+// SEMPLICE: se l’URL ha "success", esegui. In più, se provieni da stripe/paypal, esegui una volta.
+(function detectPaid() {
+  const usp = new URLSearchParams(window.location.search);
+  const hasSuccess = usp.has('success');
+  const fromGateway = (document.referrer || '').includes('stripe.com') || (document.referrer || '').includes('paypal.com');
+
+  // evita doppi trigger nella stessa sessione
+  const alreadyHandled = sessionStorage.getItem('eggscream_paid_handled') === '1';
+
+  if ((hasSuccess || fromGateway) && !alreadyHandled) {
+    sessionStorage.setItem('eggscream_paid_handled', '1');
+    runPostPaymentFlow();
+  }
+})();
 </script>
+
 
 <!-- Analytics Plausible -->
 <script defer data-domain="eggscream.com" src="https://plausible.io/js/script.js"></script>
@@ -584,6 +590,7 @@ async function runPostPaymentFlow() {
 
 </body>
 </html>
+
 
 
 
