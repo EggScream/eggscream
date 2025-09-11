@@ -476,37 +476,52 @@ function layEgg(){
   syncNestVisual(localEggs);
 })();
 
-/* POST-PAGAMENTO: incrementa globale + suoni + CTA iOS */
-if (window.location.search.includes("success=1")) {
+/* POST-PAGAMENTO (Stripe/PayPal): aggiungi uovo, aggiorna contatore, gestisci audio in sicurezza */
+(() => {
+  const qs = new URLSearchParams(window.location.search);
+  const paid =
+    qs.get('success') === '1' ||                 // tuo vecchio schema (PayPal)
+    qs.get('redirect_status') === 'succeeded';   // schema Stripe Payment Links
+
+  if (!paid) return;
+
   (async () => {
-    const newVal = await hitCounter().catch(()=>null);
-    if(newVal !== null){ localEggs = newVal; render(); }
-    const prevCtx = audioCtx;
-    audioCtx = null;
+    // prova ad aggiornare il contatore globale; se fallisce, incrementa almeno in locale
+    let newVal = null;
+    try { newVal = await hitCounter(); } catch(_) {}
+    if (Number.isFinite(newVal)) localEggs = newVal; else localEggs = (localEggs||0) + 1;
+    render();
+
+    // aggiungi l’uovo subito e sincronizza la griglia
     addEgg();
     syncNestVisual(localEggs);
-    audioCtx = prevCtx;
 
-    const cta = document.createElement('button');
-    cta.textContent = 'Tap to celebrate 🎉🐔';
-    cta.className = 'miniBtn';
-    cta.style.marginTop = '10px';
-    document.querySelector('.controls').appendChild(cta);
+    // prova a fare "plop" se l'audio è consentito; altrimenti mostra CTA per sbloccarlo
+    if (audioCtx && audioCtx.state === 'running') {
+      tryPlop(); showRubber();
+    } else {
+      const cta = document.createElement('button');
+      cta.textContent = 'Tap to celebrate 🎉🐔';
+      cta.className = 'miniBtn';
+      cta.style.marginTop = '10px';
+      document.querySelector('.controls').appendChild(cta);
 
-    function celebrate(){
-      if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-      if(audioCtx.state==='suspended') audioCtx.resume();
-      cluck(); setTimeout(plop,140); showRubber();
-      cta.remove(); document.removeEventListener('pointerdown', celebrateOnce, true);
+      function celebrate(){
+        if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+        if(audioCtx.state==='suspended') audioCtx.resume();
+        cluck(); setTimeout(plop,140); showRubber();
+        cta.remove(); document.removeEventListener('pointerdown', celebrateOnce, true);
+      }
+      const celebrateOnce = () => celebrate();
+      cta.addEventListener('click', celebrate);
+      document.addEventListener('pointerdown', celebrateOnce, true);
     }
-    cta.addEventListener('click', celebrate);
-    function celebrateOnce(){ celebrate(); }
-    document.addEventListener('pointerdown', celebrateOnce, true);
 
+    // pulisci la query string
     history.replaceState({}, document.title, window.location.pathname);
     lastEl.textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
   })();
-}
+})();
 
 /* Manifesto open/close + ESC + click fuori */
 function showManifesto(){ backMan.style.display='flex'; closeMan.focus(); }
@@ -594,6 +609,7 @@ async function renderPayPalButtons(){
 
 </body>
 </html>
+
 
 
 
