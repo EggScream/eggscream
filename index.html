@@ -495,78 +495,64 @@ function detectPaidReturn() {
 }
 
 // Esegui post-pagamento
+<script>
 async function runPostPaymentFlow() {
   console.log('[EggScream] runPostPaymentFlow: start');
 
   // 1) Prova ad aggiornare il contatore globale
-  let hitOk = false;
-  try {
-    const newVal = await hitCounter().catch(()=>null);
-    if (newVal !== null) {
-      localEggs = newVal;
-      render();
-      hitOk = true;
-      console.log('[EggScream] hitCounter OK:', newVal);
-    } else {
-      console.warn('[EggScream] hitCounter returned null');
-    }
-  } catch (e) {
-    console.warn('[EggScream] hitCounter error:', e);
+  let newVal = null;
+  try { newVal = await hitCounter().catch(() => null); } catch (e) {}
+  if (Number.isFinite(newVal)) {
+    localEggs = newVal;               // contatore globale OK
+  } else {
+    localEggs = (localEggs || 0) + 1; // fallback: almeno +1 locale
   }
+  render();
 
-  // 2) Aggiungi SEMPRE almeno un uovo in UI (anche se CountAPI non risponde)
+  // 2) Aggiorna subito la UI e allinea la griglia
   try {
     const prevCtx = audioCtx;
-    audioCtx = null;           // evita blocco audio auto
-    addEgg();
-    syncNestVisual(localEggs); // mantiene coerenza 7x7 + badge
+    audioCtx = null;           // evita blocchi audio auto
+    addEgg();                  // uovo visivo immediato
+    syncNestVisual(localEggs); // ora usa il valore già incrementato
     audioCtx = prevCtx;
-    console.log('[EggScream] addEgg() called');
+    console.log('[EggScream] egg added & grid synced ->', localEggs);
   } catch (e) {
-    console.error('[EggScream] addEgg() failed:', e);
+    console.error('[EggScream] addEgg/sync failed:', e);
   }
 
-  // 3) CTA per sbloccare i suoni su iOS
+  // 3) Se l’audio è già sbloccato, fai un “plop”+rubber; altrimenti CTA
   try {
-    const cta = document.createElement('button');
-    cta.textContent = 'Tap to celebrate 🎉🐔';
-    cta.className = 'miniBtn';
-    cta.style.marginTop = '10px';
-    document.querySelector('.controls').appendChild(cta);
+    if (audioCtx && audioCtx.state === 'running') {
+      tryPlop(); showRubber();
+    } else {
+      const cta = document.createElement('button');
+      cta.textContent = 'Tap to celebrate 🎉🐔';
+      cta.className = 'miniBtn';
+      cta.style.marginTop = '10px';
+      document.querySelector('.controls').appendChild(cta);
 
-    function celebrate(){
-      if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-      if(audioCtx.state==='suspended') audioCtx.resume();
-      cluck(); setTimeout(plop,140); showRubber();
-      cta.remove(); document.removeEventListener('pointerdown', celebrateOnce, true);
+      function celebrate() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        cluck(); setTimeout(plop, 140); showRubber();
+        cta.remove(); document.removeEventListener('pointerdown', celebrateOnce, true);
+      }
+      const celebrateOnce = () => celebrate();
+      cta.addEventListener('click', celebrate);
+      document.addEventListener('pointerdown', celebrateOnce, true);
     }
-    cta.addEventListener('click', celebrate);
-    function celebrateOnce(){ celebrate(); }
-    document.addEventListener('pointerdown', celebrateOnce, true);
-    console.log('[EggScream] CTA inserted');
-  } catch (e) {
-    console.warn('[EggScream] CTA insert failed:', e);
-  }
+  } catch (e) {}
 
   // 4) Pulizia URL e flag
   try {
     history.replaceState({}, document.title, window.location.pathname);
     localStorage.removeItem('eggscream_pending_payment');
-    lastEl.textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    console.log('[EggScream] cleanup done');
-  } catch(e) {}
+    lastEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  } catch (e) {}
 
   console.log('[EggScream] runPostPaymentFlow: end');
 }
-
-// Avvia il flusso se rileviamo ritorno pagato
-(function bootPaid() {
-  const paid = detectPaidReturn();
-  console.log('[EggScream] paid return?', paid);
-  if (paid) {
-    runPostPaymentFlow();
-  }
-})();
 </script>
 
 <!-- Analytics Plausible -->
@@ -596,6 +582,7 @@ async function runPostPaymentFlow() {
 
 </body>
 </html>
+
 
 
 
