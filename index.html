@@ -549,9 +549,39 @@ async function renderPayPalButtons(){
 <!-- Analytics Plausible -->
 <script defer data-domain="eggscream.com" src="https://plausible.io/js/script.js"></script>
 
+<!-- Suono bottoni -->
+<script>
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function buttonSound() {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc.type = "square";
+  osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.15);
+
+  gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.15);
+
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + 0.15);
+}
+
+document.querySelectorAll("button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    buttonSound();
+  });
+});
+</script>
 
 </body>
 </html>
+
+
+
 
 
 
