@@ -23,14 +23,35 @@
 <meta name="twitter:title" content="EggScream 🐔">
 <meta name="twitter:description" content="The dumbest $1 you'll ever spend.">
 <meta name="twitter:image" content="https://eggscream.com/og.png">
+  
+<!-- Extra SEO / Social -->
+<meta property="og:site_name" content="EggScream" />
+<meta property="og:locale" content="en_US" />
+<meta name="theme-color" content="#22de07" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="EggScream — One Dollar, One Egg, One Scream" />
 
 <style>
 :root{
   --bg:#fff9ef; --ink:#2b2110; --muted:#7a6a4f; --accent:#2de07e; --border:#e6d7ae;
   --eggW:34px; --eggH:46px; --gap:8px;
 }
+/* Supporto utenti con "Reduce Motion" */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 html,body{height:100%;margin:0;overflow:auto;background:var(--bg);color:var(--ink);
           font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  
+/* Safe-area per bottone fisso su mobile */
+button, .payBox {
+  padding-bottom: env(safe-area-inset-bottom);
+}
 
 /* evita che Chrome Translation tocchi questi blocchi */
 .notranslate { unicode-bidi: plaintext; }
@@ -579,6 +600,7 @@ document.querySelectorAll("button").forEach(btn => {
 
 </body>
 </html>
+
 
 
 
