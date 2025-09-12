@@ -249,14 +249,47 @@
   }
 
   // --------- UI: toggle start/stop ----------
-  const btn = document.getElementById('btn');
-  // Nota: il link apre la modale. Ma se il pagamento ha successo (querystring), facciamo autostart:
-  if (new URLSearchParams(location.search).get('success') === '1'
-      && new URLSearchParams(location.search).get('beat') === '1') {
-    // rimuovi la query dalla URL e avvia
-    history.replaceState({}, document.title, location.pathname);
-    playAlternating();
+const btn = document.getElementById('btn');
+
+// se è in play, il bottone deve fare STOP (e NON aprire la modale)
+btn.addEventListener('click', (e) => {
+  if (isPlaying) {
+    e.preventDefault();   // evita apertura #payModal
+    stopAlternating();
   }
+});
+
+// CTA per sbloccare audio al ritorno dal pagamento
+function insertCelebrateCTA(){
+  const cta = document.createElement('button');
+  cta.textContent = 'Tap to celebrate 🎉🐔';
+  cta.className = 'miniBtn';
+  cta.style.marginTop = '10px';
+  // lo aggiungo sotto al bottone principale
+  document.querySelector('.inner').appendChild(cta);
+
+  function go(){
+    ac();                // crea/resume AudioContext (gesture!)
+    playAlternating();   // parte urlo+beat
+    cta.remove();
+  }
+  // un solo tap basta
+  cta.addEventListener('click', go, { once: true });
+
+  // fallback: qualunque tap sulla pagina sblocca (se cliccano altrove)
+  function unlockOnce(){ go(); document.removeEventListener('pointerdown', unlockOnce, true); }
+  document.addEventListener('pointerdown', unlockOnce, true);
+}
+
+// Autostart “soft”: mostra CTA se torni con ?success=1&beat=1
+(() => {
+  const qp = new URLSearchParams(location.search);
+  if (qp.get('success') === '1' && qp.get('beat') === '1') {
+    history.replaceState({}, document.title, location.pathname); // pulisci URL
+    insertCelebrateCTA();
+  }
+})();
+
 
   // --------- PayPal lazy (render in modale) ----------
   let paypalLoaded = false;
@@ -294,6 +327,7 @@
   </script>
 </body>
 </html>
+
 
 
 
