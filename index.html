@@ -285,9 +285,11 @@
   // Se non ci sono (Stripe non li conserva) ma torni da stripe.com o avevi il flag, mostra il TAP.
   (async function maybeAutoStart(){
     const p = new URLSearchParams(location.search);
-    const paid = p.get('success') === '1' && p.get('beat') === '1';
-    const cameFromStripe = document.referrer && /stripe\.com/i.test(document.referrer);
-    const hadPending = (()=>{ try{ return localStorage.getItem('eggscreamPending')==='1'; }catch(e){ return false; }})();
+// più permissivo: basta success=1, oppure il referrer di Stripe
+const cameFromStripe = document.referrer.includes('stripe.com') || document.referrer.includes('checkout.stripe.com');
+const paid = (p.get('success') === '1') || cameFromStripe;
+
+if (!paid) return;
 
     if (paid) {
       history.replaceState({}, document.title, location.pathname);
@@ -354,6 +356,7 @@
   </script>
 </body>
 </html>
+
 
 
 
