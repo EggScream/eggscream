@@ -274,43 +274,43 @@
   const celebrateCta = document.getElementById('celebrateCta');
   const stripeLink = document.getElementById('stripeLink');
 
-  // Flag: prima di aprire Stripe (nuova scheda) salvo l'intento
+  // Salvo un flag quando l'utente clicca "Pay with Stripe"
   if (stripeLink) {
     stripeLink.addEventListener('click', () => {
       try { localStorage.setItem('eggscreamPending','1'); } catch(e){}
     });
   }
 
-  // Autostart al ritorno: se parametri presenti -> prova a suonare.
-  // Se non ci sono (Stripe non li conserva) ma torni da stripe.com o avevi il flag, mostra il TAP.
+  // Autostart al ritorno (robusto) + fallback TAP
   (async function maybeAutoStart(){
     const p = new URLSearchParams(location.search);
-// più permissivo: basta success=1, oppure il referrer di Stripe
-const cameFromStripe = document.referrer.includes('stripe.com') || document.referrer.includes('checkout.stripe.com');
-const paid = (p.get('success') === '1') || cameFromStripe;
+    const queryPaid = (p.get('success') === '1' && p.get('beat') === '1');
+    const cameFromStripe =
+      document.referrer.includes('stripe.com') ||
+      document.referrer.includes('checkout.stripe.com');
+    let hadPending = false;
+    try { hadPending = localStorage.getItem('eggscreamPending') === '1'; } catch(e){}
 
-if (!paid) return;
+    // se non c'è nessun segnale di "sto tornando da Stripe", esci (niente TAP iniziale)
+    if (!(queryPaid || cameFromStripe || hadPending)) return;
 
-    if (paid) {
-      history.replaceState({}, document.title, location.pathname);
-      try { await playAlternating(); } catch(e) {}
-      if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
-      try { localStorage.removeItem('eggscreamPending'); }catch(e){}
-      return;
-    }
+    // pulizia URL
+    try { history.replaceState({}, document.title, location.pathname); } catch(e){}
 
-    if (cameFromStripe || hadPending) {
-      showTapToPlay();
-      try { localStorage.removeItem('eggscreamPending'); }catch(e){}
-    }
+    // prova a suonare, altrimenti mostra TAP
+    try { await playAlternating(); } catch(e){}
+    if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
+
+    // rimuovi il flag
+    try { localStorage.removeItem('eggscreamPending'); } catch(e){}
   })();
 
   // CTA dinamico per sbloccare audio con un tap
   function showTapToPlay(){
-    const b = document.getElementById('tapToPlay');
-    if (b) return;
-    celebrateCta.style.display = 'inline-block';
-    celebrateCta.onclick = () => { playAlternating(); celebrateCta.style.display='none'; };
+    if (celebrateCta.style.display !== 'inline-block') {
+      celebrateCta.style.display = 'inline-block';
+      celebrateCta.onclick = () => { playAlternating(); celebrateCta.style.display='none'; };
+    }
   }
 
   // Bottone principale: mentre suona diventa STOP (non apre la modale)
@@ -356,8 +356,3 @@ if (!paid) return;
   </script>
 </body>
 </html>
-
-
-
-
-
