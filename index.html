@@ -23,7 +23,7 @@
     @keyframes flash{0%{background:#fff}50%{background:#fff6f6}100%{background:#fff}}
     @media (prefers-reduced-motion:reduce){ .flash{animation:none} .btn{transition:none} }
 
-    /* --- Modale pagamento (semplicissima, no JS per aprire/chiudere) --- */
+    /* --- Modale pagamento --- */
     .payModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
       backdrop-filter:blur(3px);z-index:100;align-items:center;justify-content:center}
     .payModal:target{display:flex}
@@ -37,6 +37,10 @@
     .payBtn.stripe{background:#635bff}
     .payNote{font-size:12px;color:#666;margin-top:6px}
     .miniBtn{border:0;background:#eee;color:#111;padding:8px 10px;border-radius:10px;cursor:pointer}
+
+    /* CTA post-pagamento (fallback autoplay) */
+    #celebrateCta{display:none;margin-top:12px;border:0;border-radius:10px;padding:10px 12px;cursor:pointer;
+      background:#ffe08a;color:#3a2500;font-weight:800}
   </style>
 </head>
 <body>
@@ -45,10 +49,13 @@
       <h1>chicken or egg?</h1>
       <p><strong>neither. the scream came first.</strong></p>
 
-      <!-- Il bottone ora apre la MODALE di pagamento -->
+      <!-- Il bottone apre la MODALE di pagamento -->
       <a id="btn" class="btn" href="#payModal">💥🐔🥚 1$ MAKE IT SCREAM — PLAY THE BEAT 💥🐔🥚</a>
 
       <p class="muted">Volume high. No refunds. Only scream.</p>
+
+      <!-- CTA che appare solo se l’autoplay viene bloccato -->
+      <button id="celebrateCta">Tap to celebrate 🎉🐔</button>
     </div>
   </div>
 
@@ -79,8 +86,21 @@
   let ctx;
   function ac(){
     if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)();
-    if(ctx.state==='suspended') ctx.resume();
     return ctx;
+  }
+  async function ensureRunning(){
+    const c = ac();
+    if (c.state === 'suspended') {
+      try { await c.resume(); } catch(e){}
+    }
+    // se ancora non "running", aspetta il cambio stato
+    if (c.state !== 'running') {
+      await new Promise(res=>{
+        const onChange=()=>{ if(c.state==='running'){ c.removeEventListener('statechange',onChange); res(); } };
+        c.addEventListener('statechange', onChange);
+      });
+    }
+    return c;
   }
   function mkDist(c, amt=24){
     const ws = c.createWaveShaper(), n=512, curve=new Float32Array(n);
@@ -196,7 +216,7 @@
   // ---------- Beat (2s) ----------
   function scheduleBeat2s(c, start, out){
     const dur = 2.0;
-    const beat = 0.5; // 120 BPM (quarter = 0.5s)
+    const beat = 0.5; // 120 BPM
     for(let i=0;i<4;i++){
       const t = start + i*beat;
       if(i===0 || i===2) kickPlop(c, t, out); else snareCluck(c, t, out);
@@ -208,10 +228,10 @@
 
   // ---------- Alternanza: 3s scream -> 2s beat -> loop ----------
   let loopTimer = null, cleanup = null;
-  let isPlaying = false; // toggle stato
+  let isPlaying = false;
 
-  function playAlternating(){
-    const c = ac();
+  async function playAlternating(){
+    const c = await ensureRunning(); // << attende il resume
     if (cleanup) { try{ cleanup(); }catch(e){} cleanup = null; }
 
     const master = c.createGain(); master.gain.value = 0.95;
@@ -221,15 +241,15 @@
     master.connect(softLim).connect(comp).connect(c.destination);
 
     const PERIOD = 5.0; // 3s urlo + 2s beat
-    let base = c.currentTime + 0.03;
+    let base = c.currentTime + 0.08; // << leggero margine extra
 
-    const afterScream = chickenScream3s(c, base, master); // 3.0s
-    scheduleBeat2s(c, afterScream + 0.05, master);        // 2.0s
+    const afterScream = chickenScream3s(c, base, master);
+    scheduleBeat2s(c, afterScream + 0.06, master);
 
     loopTimer = setInterval(()=>{
       base += PERIOD;
       const endS = chickenScream3s(c, base, master);
-      scheduleBeat2s(c, endS + 0.05, master);
+      scheduleBeat2s(c, endS + 0.06, master);
     }, PERIOD * 1000);
 
     cleanup = () => {
@@ -240,6 +260,8 @@
     };
     isPlaying = true;
     btn.textContent = "🛑 STOP THE SCREAM";
+    // se era visibile il CTA, nascondilo
+    celebrateCta.style.display = 'none';
   }
   function stopAlternating(){
     if (cleanup) { try{ cleanup(); }catch(e){} }
@@ -249,84 +271,39 @@
   }
 
   // --------- UI: toggle start/stop ----------
-const btn = document.getElementById('btn');
+  const btn = document.getElementById('btn');
+  const celebrateCta = document.getElementById('celebrateCta');
 
-// se è in play, il bottone deve fare STOP (e NON aprire la modale)
-btn.addEventListener('click', (e) => {
-  if (isPlaying) {
-    e.preventDefault();   // evita apertura #payModal
-    stopAlternating();
-  }
-});
+  // Autostart dopo pagamento (se possibile), altrimenti mostra CTA
+  (async function maybeAutoStart(){
+    const params = new URLSearchParams(location.search);
+    const paid = params.get('success') === '1' && params.get('beat') === '1';
+    if (!paid) return;
 
-// CTA per sbloccare audio al ritorno dal pagamento
-function insertCelebrateCTA(){
-  const cta = document.createElement('button');
-  cta.textContent = 'Tap to celebrate 🎉🐔';
-  cta.className = 'miniBtn';
-  cta.style.marginTop = '10px';
-  // lo aggiungo sotto al bottone principale
-  document.querySelector('.inner').appendChild(cta);
+    // pulisci la URL
+    history.replaceState({}, document.title, location.pathname);
 
-  function go(){
-    ac();                // crea/resume AudioContext (gesture!)
-    playAlternating();   // parte urlo+beat
-    cta.remove();
-  }
-  // un solo tap basta
-  cta.addEventListener('click', go, { once: true });
-
-  // fallback: qualunque tap sulla pagina sblocca (se cliccano altrove)
-  function unlockOnce(){ go(); document.removeEventListener('pointerdown', unlockOnce, true); }
-  document.addEventListener('pointerdown', unlockOnce, true);
-}
-
-// Autostart “soft”: mostra CTA se torni con ?success=1&beat=1
-(() => {
-  const qp = new URLSearchParams(location.search);
-  if (qp.get('success') === '1' && qp.get('beat') === '1') {
-    history.replaceState({}, document.title, location.pathname); // pulisci URL
-    insertCelebrateCTA();
-  }
-})();
-
-
-  // --------- PayPal lazy (render in modale) ----------
-  let paypalLoaded = false;
-  function loadPayPalSDK(){
-    return new Promise((resolve,reject)=>{
-      if (paypalLoaded && window.paypal) return resolve();
-      const s = document.createElement('script');
-      s.src = "https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=USD&intent=capture";
-      s.onload = ()=>{ paypalLoaded = true; resolve(); };
-      s.onerror = reject;
-      document.head.appendChild(s);
-    });
-  }
-  function maybeInitPayPal(){
-    const container = document.getElementById('paypalButtons');
-    if (container && !container.hasChildNodes()) {
-      loadPayPalSDK().then(()=>{
-        window.paypal.Buttons({
-          style: { layout:'vertical', color:'gold', shape:'pill', label:'pay' },
-          createOrder: (data, actions) => actions.order.create({
-            purchase_units: [{ amount: { value: '1.00' } }]
-          }),
-          onApprove: (data, actions) => {
-            return actions.order.capture().then(()=>{
-              // chiudi modale e fai partire il beat
-              location.href = location.pathname + "?success=1&beat=1";
-            });
-          }
-        }).render('#paypalButtons');
-      }).catch(()=>{});
+    try {
+      await playAlternating();   // prova ad autostartare
+    } catch(e) {
+      // fallback
     }
-  }
-  window.addEventListener('hashchange', ()=>{ if(location.hash==='#payModal') maybeInitPayPal(); });
-  if (location.hash==='#payModal') maybeInitPayPal();
+
+    // Se non sta suonando, mostra CTA manuale (autoplay bloccato)
+    if (!isPlaying || (ac().state !== 'running')) {
+      celebrateCta.style.display = 'inline-block';
+    }
+  })();
+
+  // CTA manuale (fallback)
+  celebrateCta.addEventListener('click', playAlternating);
+
+  // Click normale sul bottone principale = solo apertura modale
+  // (il toggle start/stop lo gestiamo solo dopo pagamento)
   </script>
 </body>
 </html>
+
 
 
 
