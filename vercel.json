@@ -3,7 +3,10 @@
     {
       "source": "/(.*)",
       "has": [
-        { "type": "host", "value": "www.eggscream.com" }
+        {
+          "type": "host",
+          "value": "www.eggscream.com"
+        }
       ],
       "destination": "https://eggscream.com/$1",
       "permanent": true
