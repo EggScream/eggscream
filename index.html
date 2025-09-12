@@ -73,7 +73,7 @@
       <h3>Choose your payment</h3>
       <p>💥 This $1 will trigger the screaming beat.</p>
       <div class="payBtns">
-        <!-- Stripe Payment Link: SOSTITUISCI con il tuo link -->
+        <!-- Stripe Payment Link -->
         <a
           id="stripeLink"
           href="https://buy.stripe.com/test_dRm8wI5wBf9l21W20P9oc01?success=1"
@@ -94,30 +94,35 @@
   // ---------- Audio setup ----------
   let ctx;
   function ac(){ if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)(); return ctx; }
-  async function ensureRunning() {
-  if (ctx.state === 'running') return true;
 
-  // Prova a resume, ma non aspettare all’infinito
-  ctx.resume();
-  return new Promise((resolve, reject) => {
-    let done = false;
-    const check = () => {
-      if (ctx.state === 'running' && !done) {
-        done = true;
-        resolve(true);
-      }
-    };
-    ctx.onstatechange = check;
-    setTimeout(() => {
-      if (!done) {
-        done = true;
-        reject(new Error("Autoplay blocked"));
-      }
-    }, 300); // dopo 300ms consideriamo fallito
-  });
-}
+  // Fast-fail: prova a far partire l’audio, se dopo ~300ms è ancora sospeso => consideriamo bloccato
+  async function ensureRunning(){
+    const c = ac();
+    if (c.state === 'running') return c;
 
+    try { await c.resume(); } catch(e){}
+    if (c.state === 'running') return c;
+
+    return new Promise((resolve, reject)=>{
+      let settled = false;
+      const onChange = () => {
+        if (!settled && c.state === 'running') {
+          settled = true;
+          c.removeEventListener('statechange', onChange);
+          resolve(c);
+        }
+      };
+      c.addEventListener('statechange', onChange);
+      setTimeout(()=>{
+        if (!settled) {
+          settled = true;
+          c.removeEventListener('statechange', onChange);
+          reject(new Error('Autoplay blocked'));
+        }
+      }, 300);
+    });
   }
+
   function mkDist(c, amt=24){
     const ws = c.createWaveShaper(), n=512, curve=new Float32Array(n);
     for(let i=0;i<n;i++){ const x=i/n*2-1; curve[i]=Math.tanh(amt*x); }
@@ -217,7 +222,7 @@
   let loopTimer = null, cleanup = null, isPlaying = false;
 
   async function playAlternating(){
-    const c = await ensureRunning();
+    const c = await ensureRunning();  // se non parte in 300ms, lancia errore e verrà mostrato il TAP
     if (cleanup) { try{ cleanup(); }catch(e){} cleanup = null; }
 
     const master = c.createGain(); master.gain.value = 0.95;
@@ -263,48 +268,38 @@
     });
   }
 
-  // al ritorno: query, referrer, o flag → autoplay o TAP
-(async function maybeAutoStart(){
-  const p = new URLSearchParams(location.search);
+  // al ritorno: query, referrer o flag → autoplay o TAP
+  (async function maybeAutoStart(){
+    const p = new URLSearchParams(location.search);
 
-  // 1) pagato via query (più permissivo: basta success=1)
-  const queryPaid = (p.get('success') === '1');
+    // 1) pagato via query (più permissivo: basta success=1)
+    const queryPaid = (p.get('success') === '1');
 
-  // 2) potremmo essere passati da eggscream.com → www.eggscream.com:
-  //    in quel caso il referrer è eggscream.com (non stripe),
-  //    ma *contiene ancora la query ?success=1*. Verifichiamolo.
-  const ref = document.referrer || "";
-  const refHasSuccess = /[?&]success=1\b/i.test(ref);
+    // 2) potremmo essere passati da eggscream.com => www.eggscream.com
+    // in quel caso il referrer è eggscream.com (non stripe) ma contiene ancora ?success=1
+    const ref = document.referrer || "";
+    const refHasSuccess = /[?&]success=\b1\b/.test(ref);
 
-  // 3) oppure veniamo direttamente da stripe.com (senza redirect)
-  const cameFromStripe = /stripe\.com/i.test(ref);
+    // 3) oppure veniamo direttamente da stripe.com (senza redirect)
+    const cameFromStripe = /stripe\.com/i.test(ref);
 
-  // 4) flag locale messo quando si clicca "Pay with Stripe"
-  let hadPending = false;
-  try { hadPending = localStorage.getItem('eggscreamPending') === '1'; } catch(e){}
+    // 4) flag locale messo quando si clicca “Pay with Stripe”
+    let hadPending = false;
+    try { hadPending = localStorage.getItem('eggscreamPending') === '1'; } catch(e){}
 
-  // se non abbiamo alcun segnale di ritorno da pagamento, non fare nulla (niente TAP al primo load)
-  if (!(queryPaid || refHasSuccess || cameFromStripe || hadPending)) return;
+    // se non abbiamo alcun segnale di ritorno da pagamento, non fare nulla
+    if (!(queryPaid || refHasSuccess || cameFromStripe || hadPending)) return;
 
-  // pulisci URL (toglie ?success=1 se presente)
-  try { history.replaceState({}, document.title, location.pathname); } catch(e){}
+    // pulisci URL (toglie ?success=1 se presente)
+    try { history.replaceState({}, document.title, location.pathname); } catch(e){}
 
-  // prova ad avviare subito; se l'autoplay è bloccato, mostra TAP
-  try {
-  await playAlternating();
-} catch(e) {
-  console.warn("Autoplay bloccato:", e);
-  showTapToPlay();   // se Chrome blocca, mostra subito il TAP
-}
+    // prova ad avviare subito; se l’autoplay è bloccato, mostra TAP
+    try { await playAlternating(); } catch(e){}
+    if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
 
-if (!isPlaying || (ctx && ctx.state !== 'running')) {
-  showTapToPlay();   // ulteriore sicurezza
-}
-
-  // pulizia flag
-  try { localStorage.removeItem('eggscreamPending'); } catch(e){}
-})();
-
+    // pulizia flag
+    try { localStorage.removeItem('eggscreamPending'); } catch(e){}
+  })();
 
   function showTapToPlay(){
     if (celebrateCta.style.display !== 'inline-block') {
@@ -323,6 +318,8 @@ if (!isPlaying || (ctx && ctx.state !== 'running')) {
   </script>
 </body>
 </html>
+
+
 
 
 
