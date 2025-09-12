@@ -270,56 +270,54 @@
     btn.textContent = "💥🐔🥚 1$ MAKE IT SCREAM — PLAY THE BEAT 💥🐔🥚";
   }
 
-  // --------- UI: toggle start/stop ----------
+  // --------- RIFINITURE POST-PAGAMENTO E UI ---------
 const btn = document.getElementById('btn');
 
-// Crea un piccolo CTA per sbloccare l'audio quando serve
-function showTapToPlay(){
-  // evitiamo duplicati
-  if (document.getElementById('tapToPlay')) return;
-  const cta = document.createElement('button');
-  cta.id = 'tapToPlay';
-  cta.textContent = 'Tap to celebrate 🎉🐔';
-  cta.style.cssText = `
-    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
-    z-index: 9999; padding: 10px 14px; border-radius: 10px;
-    border: 0; cursor: pointer; font-weight: 700;
-    background: #ffe08a; color: #3a2500; box-shadow: 0 6px 18px rgba(0,0,0,.2);
-  `;
-  cta.addEventListener('click', () => {
-    try { ac(); } catch(e){}
-    if (ctx && ctx.state === 'suspended') ctx.resume();
-    // avvia il pezzo alternato (urlo + beat)
-    playAlternating();
-    cta.remove();
-  });
-  document.body.appendChild(cta);
-}
+// 1) Autostart al ritorno da Stripe (se consentito), altrimenti CTA "tap"
+(async function maybeAutoStart(){
+  const p = new URLSearchParams(location.search);
+  const paid = p.get('success') === '1' && p.get('beat') === '1';
+  if (!paid) return;
 
-// Autostart dopo pagamento
-const qs = new URLSearchParams(location.search);
-if (qs.get('success') === '1' && qs.get('beat') === '1') {
-  // rimuovi la query dalla URL (pulizia)
+  // pulisci la URL
   history.replaceState({}, document.title, location.pathname);
-  // prova a partire subito…
-  ac();
-  if (ctx && ctx.state === 'running') {
-    playAlternating();
-  } else {
-    // …altrimenti mostra il CTA per sbloccare l’audio
-    showTapToPlay();
+
+  try {
+    await playAlternating();        // prova a suonare subito (desktop di solito ok)
+  } catch(e) {
+    showTapToPlay();                // fallback se l'audio è bloccato
   }
+
+  // se parte ma l'audio è bloccato, mostra comunque la CTA
+  if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
+})();
+
+// 2) CTA dinamico per sbloccare audio con un tap
+function showTapToPlay(){
+  if (document.getElementById('tapToPlay')) return; // già presente
+  const b = document.createElement('button');
+  b.id = 'tapToPlay';
+  b.textContent = 'Tap to celebrate 🎉🐔';
+  b.className = 'miniBtn';
+  b.style.marginTop = '12px';
+  // mettilo vicino al bottone principale
+  document.querySelector('.inner')?.appendChild(b);
+  b.addEventListener('click', () => {
+    playAlternating();
+    b.remove();
+  });
 }
 
-// Comportamento del bottone principale:
-// - se NON sta suonando: lascia aprire la modale (#payModal)
-// - se STA suonando: ferma (e NON aprire la modale)
+// 3) Quando STA suonando, il bottone principale diventa STOP (non riapre la modale)
 btn.addEventListener('click', (e) => {
-  if (!isPlaying) return;         // apri modale di pagamento
-  e.preventDefault();             // blocca l’ancora #payModal
-  stopAlternating();              // ferma audio
+  if (isPlaying) {
+    e.preventDefault();    // blocca l'ancora #payModal
+    stopAlternating();     // ferma audio
+  }
 });
+
 
   </script>
 </body>
 </html>
+
