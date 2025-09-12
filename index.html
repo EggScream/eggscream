@@ -251,20 +251,39 @@
   }
 
   // al ritorno: query, referrer, o flag → autoplay o TAP
-  (async function maybeAutoStart(){
-    const p = new URLSearchParams(location.search);
-    const queryPaid = (p.get('success') === '1' && p.get('beat') === '1');
-    const ref = document.referrer || "";
-    const cameFromStripe = /(?:^|\/\/)(?:buy\.|checkout\.)?stripe\.com/i.test(ref);
-    let hadPending = false; try { hadPending = localStorage.getItem('eggscreamPending') === '1'; } catch(e){}
+(async function maybeAutoStart(){
+  const p = new URLSearchParams(location.search);
 
-    if (!(queryPaid || cameFromStripe || hadPending)) return; // niente TAP al primo load
+  // 1) pagato via query (più permissivo: basta success=1)
+  const queryPaid = (p.get('success') === '1');
 
-    try { history.replaceState({}, document.title, location.pathname); } catch(e){}
-    try { await playAlternating(); } catch(e){}
-    if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
-    try { localStorage.removeItem('eggscreamPending'); } catch(e){}
-  })();
+  // 2) potremmo essere passati da eggscream.com → www.eggscream.com:
+  //    in quel caso il referrer è eggscream.com (non stripe),
+  //    ma *contiene ancora la query ?success=1*. Verifichiamolo.
+  const ref = document.referrer || "";
+  const refHasSuccess = /[?&]success=1\b/i.test(ref);
+
+  // 3) oppure veniamo direttamente da stripe.com (senza redirect)
+  const cameFromStripe = /stripe\.com/i.test(ref);
+
+  // 4) flag locale messo quando si clicca "Pay with Stripe"
+  let hadPending = false;
+  try { hadPending = localStorage.getItem('eggscreamPending') === '1'; } catch(e){}
+
+  // se non abbiamo alcun segnale di ritorno da pagamento, non fare nulla (niente TAP al primo load)
+  if (!(queryPaid || refHasSuccess || cameFromStripe || hadPending)) return;
+
+  // pulisci URL (toglie ?success=1 se presente)
+  try { history.replaceState({}, document.title, location.pathname); } catch(e){}
+
+  // prova ad avviare subito; se l'autoplay è bloccato, mostra TAP
+  try { await playAlternating(); } catch(e){}
+  if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
+
+  // pulizia flag
+  try { localStorage.removeItem('eggscreamPending'); } catch(e){}
+})();
+
 
   function showTapToPlay(){
     if (celebrateCta.style.display !== 'inline-block') {
@@ -283,5 +302,6 @@
   </script>
 </body>
 </html>
+
 
 
