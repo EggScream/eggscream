@@ -1,17 +1,4 @@
 {
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "has": [
-        {
-          "type": "host",
-          "value": "www.eggscream.com"
-        }
-      ],
-      "destination": "https://eggscream.com",
-      "permanent": true
-    }
-  ],
   "headers": [
     {
       "source": "/favicon.v2.ico",
@@ -33,4 +20,3 @@
     }
   ]
 }
-
