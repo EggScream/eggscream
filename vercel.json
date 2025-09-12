@@ -8,7 +8,7 @@
           "value": "www.eggscream.com"
         }
       ],
-      "destination": "https://eggscream.com/$1",
+      "destination": "https://eggscream.com",
       "permanent": true
     }
   ],
@@ -33,3 +33,4 @@
     }
   ]
 }
+
