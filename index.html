@@ -1,582 +1,226 @@
-<!DOCTYPE html>
-<html lang="en" translate="no">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>EggScream 🐔 — $1 = one egg one scream</title>
-<link rel="canonical" href="https://eggscream.com/">
-<meta name="description" content="One dollar = one egg + one scream. The dumbest $1 you'll ever spend." />
-
-<!-- Favicon -->
-<link rel="icon" type="image/x-icon" href="/favicon.ico">
-
-<!-- Prevent auto-translation -->
-<meta name="google" content="notranslate">
-
-<!-- OG/Twitter Preview -->
-<meta property="og:title" content="EggScream 🐔">
-<meta property="og:description" content="Pay $1 and the chicken lays an egg. It screams.">
-<meta property="og:image" content="https://eggscream.com/og.png">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://eggscream.com/">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="EggScream 🐔">
-<meta name="twitter:description" content="The dumbest $1 you'll ever spend.">
-<meta name="twitter:image" content="https://eggscream.com/og.png">
+<!DOCTYPE html>  
+<html lang="en">  
+<head>  
+  <meta charset="UTF-8" />  
+  <title>EggScream — The Screaming Chicken Beat</title>  
+  <meta name="viewport" content="width=device-width, initial-scale=1" />  
+  <style>  
+    :root { --bg:#fff; --ink:#111; --muted:#666; }  
+    html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}  
+    .wrap{min-height:100dvh;display:flex;align-items:center;justify-content:center}  
+    .inner{width:min(680px,92vw);text-align:center}  
+    h1{margin:0 0 .4rem;font-size:clamp(28px,6vw,54px);font-weight:900;letter-spacing:-.02em}  
+    p{margin:.25rem 0 0}  
+    .muted{color:var(--muted);font-size:12px;margin-top:.6rem}  
+    .btn{  
+      display:inline-block;margin-top:1rem;padding:.9rem 1.2rem;border:1.5px solid #111;  
+      color:#111;background:transparent;font-weight:900;letter-spacing:.02em;text-decoration:none;  
+      cursor:pointer;user-select:none;transition:transform .06s ease, background .12s ease;  
+    }  
+    .btn:hover{background:#f2f2f2}  
+    .btn:active{transform:translateY(1px)}  
+    .flash{animation:flash .28s ease-in-out 1}  
+    @keyframes flash{0%{background:#fff}50%{background:#fff6f6}100%{background:#fff}}  
+    @media (prefers-reduced-motion:reduce){ .flash{animation:none} .btn{transition:none} }  
+  </style>  
+</head>  
+<body>  
+  <div class="wrap" id="stage">  
+    <div class="inner">  
+      <h1>chicken or egg?</h1>  
+      <p><strong>neither. the scream came first.</strong></p>  
   
-<!-- Extra SEO / Social -->
-<meta property="og:site_name" content="EggScream" />
-<meta property="og:locale" content="en_US" />
-<meta name="theme-color" content="#22de07" />
-<meta property="og:image:width" content="1200" />
-<meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="EggScream — One Dollar, One Egg, One Scream" />
-
-<style>
-:root{
-  --bg:#fff9ef; --ink:#2b2110; --muted:#7a6a4f; --accent:#2de07e; --border:#e6d7ae;
-  --eggW:34px; --eggH:46px; --gap:8px;
-}
-/* Supporto utenti con "Reduce Motion" */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation: none !important;
-    transition: none !important;
-  }
-}
-
-html,body{height:100%;margin:0;overflow:auto;background:var(--bg);color:var(--ink);
-          font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+      <button id="btn" class="btn">💥🐔🥚 1$ MAKE IT SCREAM — PLAY THE BEAT 💥🐔🥚</button>  
   
-/* Safe-area per bottone fisso su mobile */
-button, .payBox {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-/* evita che Chrome Translation tocchi questi blocchi */
-.notranslate { unicode-bidi: plaintext; }
-
-.card{
-  box-sizing:border-box;
-  width:min(780px,94vw);
-  height:100dvh; max-height:100svh; min-height:100vh;
-  margin:auto;
-  display:grid; grid-template-rows:auto 1fr auto;
-  border:2px solid var(--border); border-radius:16px; background:#fffdf8;
-  box-shadow:0 10px 32px rgba(0,0,0,.15); overflow:hidden
-}
-
-.topbar{position:sticky; top:0; z-index:3; background:#fffdf8cc; backdrop-filter:saturate(120%) blur(2px);
-        padding:14px 16px; border-bottom:1px solid #efe3c5}
-h1{margin:0;font-size:22px; line-height:1}
-.sub{font-size:14px; opacity:.85; margin-top:4px}
-.sub small{opacity:.8}
-.miniBtn{display:inline-block;margin-top:8px;border:0;border-radius:10px;padding:8px 10px;cursor:pointer;
-         background:#ffe08a;color:#3a2500;font-weight:600}
-
-/* Progress bar trash multicolore */
-.progressWrap{margin-top:10px}
-.progressHead{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted)}
-.progressTitle{font-weight:700}
-.progressMsg{font-size:12px;margin-top:4px;color:#2b2110;display:none}
-.progressBox{height:14px;border:1px solid #e7dcb9;background:#fff7df;border-radius:999px;overflow:hidden;margin-top:6px}
-.progressBar{
-  height:100%;width:0%;
-  background: repeating-linear-gradient(
-    90deg,
-    #ff004c 0 14px,
-    #ff7a00 14px 28px,
-    #ffe600 28px 42px,
-    #00d26a 42px 56px,
-    #00b2ff 56px 70px,
-    #7a5cff 70px 84px,
-    #ff47d6 84px 98px
-  );
-  background-size: 140px 100%;
-  animation: moveStripes 1.2s linear infinite;
-  transition: width .25s ease;
-}
-@keyframes moveStripes{ from{background-position:0 0} to{background-position:-140px 0} }
-
-/* RIGA STATS (Total + Share) */
-.statsRow{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}
-.totalBig{font-size:18px;font-weight:800;color:#1d1508}
-.totalBig b{font-size:20px}
-.shareX{display:inline-block;margin-top:0;padding:6px 10px;font-size:14px;
-  background:#000;color:#fff;border-radius:8px;text-decoration:none;white-space:nowrap}
-
-/* Mini-CTA in alto (solo desktop) */
-.actions{display:flex;gap:6px;align-items:center}
-.btnTopCta{
-  display:none; padding:6px 10px; font-size:14px; font-weight:700;
-  border-radius:8px; background:#2de07e; color:#05280f; text-decoration:none;
-}
-@media (min-width:900px){
-  .btnTopCta{ display:inline-block; }
-}
-
-/* Stage / Nest 7x7 */
-.stage{position:relative; padding:12px 12px 6px}
-.nestBox{
-  border:1px solid #eee; background:#faf8f3; border-radius:12px; padding:8px;
-  height: calc(7 * var(--eggH) + 8 * var(--gap)); /* 7 righe */
-  overflow-y:auto; overscroll-behavior:contain; /* fix */
-}
-#nest{
-  display:grid;
-  grid-template-columns: repeat(7, var(--eggW)); /* 7 colonne */
-  grid-auto-rows: var(--eggH);
-  justify-content: center;
-  gap: var(--gap);
-}
-.henCell{grid-column:1 / -1; display:flex; justify-content:center; align-items:center; height:var(--eggH)}
-.hen{font-size:80px; line-height:1}
-
-.egg{
-  width:var(--eggW); height:var(--eggH);
-  background:radial-gradient(circle at 50% 35%, #fff, #efe8db 70%);
-  border:2px solid #e0d9cc; border-radius:50% / 60%;
-  box-sizing:border-box; animation:drop .3s ease;
-}
-
-/* >>> NEW: badge +X (stessa misura di un uovo) <<< */
-.eggMore{
-  width:var(--eggW); height:var(--eggH);
-  display:flex; align-items:center; justify-content:center;
-  font-size:12px; font-weight:800; color:#2b2110;
-  background:#ffe08a;
-  border:2px solid #e0d9cc; border-radius:50% / 60%;
-  box-sizing:border-box;
-}
-
-@keyframes drop{0%{transform:translateY(-40px);opacity:0}100%{transform:translateY(0);opacity:1}}
-
-/* Footer sticky con aria sotto al bottone */
-.controls{
-  position:sticky; bottom:0;
-  padding:16px 16px 22px; border-top:1px solid #efe3c5; text-align:center; background:#fffdf8
-}
-.btn{font-size:18px;padding:14px 18px;border:0;border-radius:12px;background:var(--accent);
-     color:#05280f;cursor:pointer;text-decoration:none;display:inline-block}
-.btn:active{transform:translateY(1px)}
-.row{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;color:#7a6a4f; margin-top:8px}
-.row b{color:#000}
-.banner{display:none;margin-top:6px; font-weight:700}
-
-/* Rubber Chicken overlay + flash */
-.overlay{position:absolute; inset:0; pointer-events:none; display:flex; align-items:center; justify-content:center}
-.rubber{display:none}
-.rubber .emoji{font-size:160px; filter: drop-shadow(0 6px 18px rgba(0,0,0,.35)); animation:shake .8s ease-in-out 1}
-@keyframes shake{
-  0%,100%{transform:rotate(0deg) scale(1)}
-  20%{transform:rotate(-14deg) scale(1.06)}
-  40%{transform:rotate(14deg) scale(1.08)}
-  60%{transform:rotate(-10deg) scale(1.06)}
-  80%{transform:rotate(10deg) scale(1.04)}
-}
-.flash{animation:flashBg .9s ease-in-out 1}
-@keyframes flashBg{
-  0%,100%{background:#faf8f3}
-  25%{background:#fff1f1}
-  50%{background:#fffceb}
-  75%{background:#f1ffef}
-}
-
-/* Manifesto modal */
-#manifestoBackdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
-   backdrop-filter:blur(2px);z-index:50;align-items:center;justify-content:center;padding:16px}
-#manifestoCard{max-width:720px;width:min(92vw,720px);max-height:85vh;overflow:auto;
-   background:#fffdf5;border:2px solid #e6d7ae;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.35);
-   padding:20px 18px}
-#manifestoCard h2{margin:0 0 8px;font-size:20px}
-#closeManifesto{border:0;background:#ffe08a;color:#3a2500;padding:8px 10px;border-radius:10px;cursor:pointer}
-
-/* Footer privacy */
-.footer{font-size:12px; color:#7a6a4f; text-align:center; margin-top:10px}
-
-/* --- CSS fallback: apri modale con :target --- */
-.payModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
-  backdrop-filter:blur(3px);z-index:100;align-items:center;justify-content:center}
-.payModal:target{display:flex} /* <<— apre SEMPRE con #payModal */
-
-.payContent{
-  background:#fffdf5;border:2px solid #e6d7ae;border-radius:16px;
-  padding:22px;max-width:420px;width:92%;text-align:center;
-  box-shadow:0 10px 30px rgba(0,0,0,.35)
-}
-.payBtns{display:flex;flex-direction:column;gap:10px;margin:18px 0}
-.payBtn{display:block;padding:12px 14px;border-radius:10px;font-weight:600;text-decoration:none;color:#fff;cursor:pointer}
-.payBtn.stripe{background:#635bff}
-.payNote{font-size:12px;color:#7a6a4f;margin-top:6px}
-
-@media (max-width:520px){
-  .btn{width:100%}
-  .totalBig{font-size:16px}
-  .totalBig b{font-size:18px}
-}
-</style>
-</head>
-<body translate="no">
-  <div class="card notranslate" translate="no">
-    <!-- Top -->
-    <div class="topbar">
-      <h1>EggScream 🐔</h1>
-      <div class="sub">
-        <b>One Dollar. One Egg. One Scream.</b><br>
-        <em>The dumbest monument on the Internet.</em>
-      </div>
-
-      <!-- Progress bar -->
-      <div class="progressWrap">
-        <div class="progressHead">
-          <div class="progressTitle">Progress of the Dumbest Monument Ever</div>
-          <div><span id="progressCount">0</span> / 100</div>
-        </div>
-        <div id="progressMsg" class="progressMsg">Even 1 egg makes history.</div>
-        <div class="progressBox"><div id="progressBar" class="progressBar"></div></div>
-
-        <!-- STATS + SHARE -->
-        <div class="statsRow">
-          <div class="totalBig">Total Eggs: <b id="localCount">0</b></div>
-          <div class="actions">
-            <a class="shareX" id="shareX" target="_blank" rel="noopener">🐦 Share on X</a>
-            <a class="btnTopCta" href="#payModal">🥚 Lay an Egg</a>
-          </div>
-        </div>
-      </div>
-
-      <button id="openManifesto" class="miniBtn">📜 Manifesto</button>
-    </div>
-
-    <!-- Centro -->
-    <div class="stage notranslate" translate="no">
-      <div class="nestBox notranslate" id="nestBox" translate="no">
-        <div id="nest" class="notranslate" translate="no"><div class="henCell"><div class="hen">🐔</div></div></div>
-      </div>
-      <div class="overlay rubber notranslate" id="rubber" translate="no"><div class="emoji">🐔</div></div>
-    </div>
-
-    <!-- Footer sticky -->
-    <div class="controls">
-      <!-- Link-ancora che apre SEMPRE la modale -->
-      <a class="btn" id="openPay" href="#payModal">🥚 Lay an Egg ($1)</a>
-      <!-- >>> UNICA AGGIUNTA RICHIESTA (sotto al bottone) <<< -->
-      <small style="display:block;margin-top:6px;font-size:0.8rem;opacity:0.8;">
-        No refunds. Only screams.
-      </small>
-
-      <div class="row" style="margin-top:6px">
-        <div>Last: <b id="last">none</b></div>
-      </div>
-
-      <div id="screamBanner" class="banner">Congrats! You made the chicken scream.</div>
-
-      <div class="footer">No login • No account • Payments via Stripe/PayPal</div>
-    </div>
-  </div>
-
-  <!-- Manifesto Modal -->
-  <div id="manifestoBackdrop">
-    <div id="manifestoCard">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px">
-        <h2>🐔 The Screaming Chicken Manifesto</h2>
-        <button id="closeManifesto">✕</button>
-      </div>
-      <div style="font-size:15px;line-height:1.5;color:#2b2110">
-        <p><b>One dollar → one egg. One scream.</b></p>
-        <p>Why? Because nonsense &gt; logic.<br>
-        Because the Golden Goose isn’t a fairy tale — <b>but this chicken could be</b>.<br>
-        Because the Internet deserves the dumbest monument ever.</p>
-        <p><i>We were there. We made the chicken scream.</i></p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modale Pagamento (Stripe + PayPal Smart Buttons) -->
-  <div id="payModal" class="payModal" aria-hidden="true" onclick="location.hash='';">
-    <div class="payContent" role="dialog" aria-modal="true" aria-label="Payment options" onclick="event.stopPropagation()">
-      <h3>Choose your payment</h3>
-      <p>💥 Warning: This $1 will make a chicken scream.</p>
-      <div class="payBtns">
-        <!-- Stripe: Payment Link -->
-        <a href="https://buy.stripe.com/IL_TUO_LINK?success=1"
-   class="payBtn stripe" target="_blank" rel="noopener"
-   onclick="markPaymentIntent()">💳 Pay with Stripe</a>
-
-
-        <!-- PayPal: container per Smart Buttons -->
-        <div id="paypalButtons"></div>
-        <div class="payNote">PayPal stays on-screen (pop-up) and returns automatically.</div>
-      </div>
-      <button id="closePay" class="miniBtn" onclick="location.hash=''">Cancel</button>
-    </div>
-  </div>
-
-<script>
-const GOAL = 100;
-
-let localEggs = 0;
-const nest     = document.getElementById('nest');
-const nestBox  = document.getElementById('nestBox');
-const countEl  = document.getElementById('localCount');
-const lastEl   = document.getElementById('last');
-const rubber   = document.getElementById('rubber');
-const screamBanner = document.getElementById('screamBanner');
-const progressBar  = document.getElementById('progressBar');
-const progressCount= document.getElementById('progressCount');
-const progressMsg  = document.getElementById('progressMsg');
-
-const openMan = document.getElementById('openManifesto');
-const backMan = document.getElementById('manifestoBackdrop');
-const closeMan = document.getElementById('closeManifesto');
-
-function fmt(n){ return n.toLocaleString('en-US'); }
-function render(){
-  countEl.textContent = localEggs;
-  progressCount.textContent = fmt(localEggs);
-  const pct = Math.min(100, (localEggs/GOAL)*100);
-  const minVis = 2;
-  progressBar.style.width = Math.max(pct, minVis) + '%';
-}
-
-let audioCtx;
-function ctx(){
-  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-  if(audioCtx.state==='suspended') audioCtx.resume();
-  return audioCtx;
-}
-function cluck(){ try{
-  const c=ctx(), o=c.createOscillator(), g=c.createGain();
-  o.type="square"; o.frequency.setValueAtTime(520,c.currentTime);
-  o.frequency.exponentialRampToValueAtTime(280,c.currentTime+.18);
-  o.connect(g); g.connect(c.destination);
-  g.gain.setValueAtTime(.001,c.currentTime);
-  g.gain.exponentialRampToValueAtTime(.35,c.currentTime+.02);
-  g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+.22);
-  o.start(); o.stop(c.currentTime+.24);}catch(e){} }
-function plop(){ try{
-  const c=ctx(), o=c.createOscillator(), g=c.createGain();
-  o.type="sine"; o.frequency.setValueAtTime(300,c.currentTime);
-  o.frequency.exponentialRampToValueAtTime(120,c.currentTime+.18);
-  o.connect(g); g.connect(c.destination);
-  g.gain.setValueAtTime(.001,c.currentTime);
-  g.gain.exponentialRampToValueAtTime(.32,c.currentTime+.02);
-  g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+.26);
-  o.start(); o.stop(c.currentTime+.28);}catch(e){} }
-function scream(){ try{
-  const c=ctx();const o1=c.createOscillator(),o2=c.createOscillator(),o3=c.createOscillator();
-  const trem=c.createOscillator(); trem.frequency.value=14;
-  const g=c.createGain(), tremGain=c.createGain(); const dist=c.createWaveShaper();
-  const curve=new Float32Array(256);for(let i=0;i<256;i++){const x=i/255*2-1;curve[i]=Math.tanh(3*x);}
-  dist.curve=curve;dist.oversample='4x';
-  o1.type="sawtooth";o2.type="square";o3.type="triangle";
-  o1.frequency.setValueAtTime(740,c.currentTime);
-  o2.frequency.setValueAtTime(520,c.currentTime);
-  o3.frequency.setValueAtTime(880,c.currentTime);
-  o1.frequency.exponentialRampToValueAtTime(200,c.currentTime+1.2);
-  o2.frequency.exponentialRampToValueAtTime(180,c.currentTime+1.2);
-  o3.frequency.exponentialRampToValueAtTime(220,c.currentTime+1.2);
-  o1.connect(g);o2.connect(g);o3.connect(g);
-  trem.connect(tremGain.gain);g.connect(tremGain);tremGain.connect(dist);dist.connect(c.destination);
-  g.gain.setValueAtTime(.001,c.currentTime);
-  g.gain.exponentialRampToValueAtTime(.7,c.currentTime+.06);
-  g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+1.25);
-  trem.start();o1.start();o2.start();o3.start();
-  o1.stop(c.currentTime+1.3);o2.stop(c.currentTime+1.3);o3.stop(c.currentTime+1.3);trem.stop(c.currentTime+1.3);}catch(e){} }
-
-function addEgg(){
-  const e=document.createElement('div');
-  e.className='egg';
-  nest.appendChild(e);
-  nestBox.scrollTop = nestBox.scrollHeight;
-}
-function showRubber(){
-  nestBox.classList.add('flash');
-  rubber.style.display='flex';
-  screamBanner.style.display='block';
-  scream();
-  setTimeout(()=>{ rubber.style.display='none'; }, 1200);
-  setTimeout(()=>{ nestBox.classList.remove('flash'); }, 900);
-  setTimeout(()=>{ screamBanner.style.display='none'; }, 3000);
-}
-function pingProgressMsg(){
-  progressMsg.style.display='block';
-  progressMsg.textContent='Even 1 egg makes history.';
-  clearTimeout(pingProgressMsg._t);
-  pingProgressMsg._t=setTimeout(()=>{progressMsg.style.display='none';},2000);
-}
-
-/* ==== COUNTER GLOBALE (CountAPI) ==== */
-const NS  = 'eggscream'; // namespace pubblico
-const KEY = 'eggs';            // contatore "eggs"
-
-async function ensureCounter(){
-  try {
-    await fetch(`https://api.countapi.xyz/create?namespace=${NS}&key=${KEY}&value=7`);
-  } catch(e){}
-}
-async function getCounter(){
-  try { const r = await fetch(`https://api.countapi.xyz/get/${NS}/${KEY}`); const j = await r.json(); return j.value ?? 0; }
-  catch(e){ return 7; }
-}
-async function hitCounter(){
-  const r = await fetch(`https://api.countapi.xyz/hit/${NS}/${KEY}`);
-  const j = await r.json();
-  return j.value ?? localEggs+1;
-}
-
-/* >>> NEW syncNestVisual: mostra 48 uova + badge +X se si supera 49 <<< */
-function syncNestVisual(total){
-  const max = 49;                  // capacità visiva 7x7
-  const badgeClass = 'eggMore';
-
-  // rimuovi eventuale badge esistente
-  const existingBadge = nest.querySelector('.' + badgeClass);
-  if (existingBadge) existingBadge.remove();
-
-  // quante uova "realmente" vogliamo mostrare
-  const useBadge = total > max;
-  const targetEggs = useBadge ? (max - 1) : Math.min(total, max);
-
-  // numero uova attuali
-  let eggs = nest.querySelectorAll('.egg').length;
-
-  // aggiungi uova se mancano
-  if (eggs < targetEggs){
-    for(let i = 0; i < (targetEggs - eggs); i++){ addEgg(); }
-  }
-  // rimuovi uova in eccesso (dal fondo) se troppe
-  else if (eggs > targetEggs){
-    const allEggs = nest.querySelectorAll('.egg');
-    for(let i = 0; i < (eggs - targetEggs); i++){
-      const lastEgg = allEggs[allEggs.length - 1 - i];
-      if(lastEgg) lastEgg.remove();
-    }
-  }
-
-  // aggiungi badge +X se necessario (usa l'ultima cella della griglia)
-  if (useBadge){
-    const extra = document.createElement('div');
-    extra.className = badgeClass;
-    // Mostriamo quante uova NON si vedono (mostriamo 48 reali)
-    extra.textContent = '+' + (total - (max - 1));
-    nest.appendChild(extra);
-  }
-}
-
-function layEgg(){
-  cluck();addEgg();localEggs++;render();
-  lastEl.textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  plop();showRubber();pingProgressMsg();
-}
-
-/* Inizializza: contatore REALE e uova visibili coerenti (min 7) */
-(async function initRealCounter(){
-  await ensureCounter();
-  localEggs = await getCounter(); // es: 7
-  render();
-  syncNestVisual(localEggs);
-})();
+      <p class="muted">Volume high. No refunds. Only scream.</p>  
+    </div>  
+  </div>  
   
-<!-- PATCH POST-PAYMENT ROBUSTA -->
-<script>
-// Marca che stai per pagare (se vuoi usarlo sul bottone Stripe)
-function markPaymentIntent() {
-  try { localStorage.setItem('eggscream_pending_payment', '1'); } catch(e) {}
-}
-
-// Riconosci ritorno dal pagamento
-function detectPaidReturn() {
-  try {
-    const urlOK  = window.location.search.includes('success=1');
-    const refOK  = document.referrer.includes('stripe.com') || document.referrer.includes('paypal.com');
-    const flagOK = localStorage.getItem('eggscream_pending_payment') === '1';
-    return urlOK || refOK || flagOK;
-  } catch(e) { return false; }
-}
-
-// Esegui post-pagamento
-async function runPostPaymentFlow() {
-  // 1) prova a toccare il contatore globale
-  let newVal = null;
-  try { newVal = await hitCounter().catch(()=> null); } catch (e) {}
-  if (Number.isFinite(newVal)) {
-    localEggs = newVal;          // contatore globale OK
-  } else {
-    localEggs = (localEggs || 0) + 1;  // fallback: almeno +1 locale
+  <script>  
+  // ---------- Audio setup ----------  
+  let ctx;  
+  function ac(){  
+    if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)();  
+    if(ctx.state==='suspended') ctx.resume();  
+    return ctx;  
+  }  
+  function mkDist(c, amt=24){  
+    const ws = c.createWaveShaper(), n=512, curve=new Float32Array(n);  
+    for(let i=0;i<n;i++){ const x=i/n*2-1; curve[i]=Math.tanh(amt*x); }  
+    ws.curve=curve; ws.oversample='4x'; return ws;  
+  }  
+  function flash(){  
+    const stg = document.getElementById('stage');  
+    stg.classList.remove('flash'); void stg.offsetWidth; stg.classList.add('flash');  
+  }  
+  
+  // ---------- Drum blocks ----------  
+  function kickPlop(c, t, out){  
+    const o = c.createOscillator(); o.type='sine';  
+    const g = c.createGain();  
+    o.frequency.setValueAtTime(140, t);  
+    o.frequency.exponentialRampToValueAtTime(55, t+0.16);  
+    g.gain.setValueAtTime(0.9, t);  
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.18);  
+    o.connect(g).connect(out);  
+    o.start(t); o.stop(t+0.19);  
+    o.onended = ()=>{ try{o.disconnect(); g.disconnect();}catch(e){} };  
+  
+    const buf = c.createBuffer(1, Math.floor(c.sampleRate*0.12), c.sampleRate);  
+    const d = buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;  
+    const n = c.createBufferSource(); n.buffer = buf;  
+    const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=220;  
+    const ng = c.createGain(); ng.gain.setValueAtTime(0.7, t);  
+    ng.gain.exponentialRampToValueAtTime(0.0001, t+0.14);  
+    n.connect(lp).connect(ng).connect(out);  
+    n.start(t); n.stop(t+0.14);  
+    n.onended = ()=>{ try{n.disconnect(); lp.disconnect(); ng.disconnect();}catch(e){} };  
+  }  
+  function snareCluck(c, t, out){  
+    const o = c.createOscillator(); o.type='square';  
+    const g = c.createGain();  
+    o.frequency.setValueAtTime(750, t);  
+    o.frequency.exponentialRampToValueAtTime(300, t+0.07);  
+    g.gain.setValueAtTime(0.85, t);  
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.1);  
+    o.connect(g).connect(out);  
+    o.start(t); o.stop(t+0.11);  
+    o.onended = ()=>{ try{o.disconnect(); g.disconnect();}catch(e){} };  
+  
+    const buf = c.createBuffer(1, Math.floor(c.sampleRate*0.11), c.sampleRate);  
+    const d = buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;  
+    const n = c.createBufferSource(); n.buffer = buf;  
+    const bp = c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=3000; bp.Q.value=2.5;  
+    const ng = c.createGain(); ng.gain.setValueAtTime(0.6, t);  
+    ng.gain.exponentialRampToValueAtTime(0.0001, t+0.12);  
+    n.connect(bp).connect(ng).connect(out);  
+    n.start(t); n.stop(t+0.12);  
+    n.onended = ()=>{ try{n.disconnect(); bp.disconnect(); ng.disconnect();}catch(e){} };  
+  }  
+  function hatClick(c, t, out){  
+    const buf = c.createBuffer(1, Math.floor(c.sampleRate*0.05), c.sampleRate);  
+    const d = buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*0.9;  
+    const n = c.createBufferSource(); n.buffer = buf;  
+    const hp = c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=5000;  
+    const g = c.createGain(); g.gain.setValueAtTime(0.35, t);  
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.05);  
+    n.connect(hp).connect(g).connect(out);  
+    n.start(t); n.stop(t+0.06);  
+    n.onended = ()=>{ try{n.disconnect(); hp.disconnect(); g.disconnect();}catch(e){} };  
+  }  
+  
+  // ---------- Scream (3s) ----------  
+  function chickenScream3s(c, t, out){  
+    flash();  
+    const len = 3.0;  
+    const bus = c.createGain(); bus.gain.value = 0.85;  
+    const dist = mkDist(c, 20);  
+    const bp = c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1800; bp.Q.value=4.5;  
+    const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2800;  
+    bus.connect(dist).connect(bp).connect(lp).connect(out);  
+  
+    [-10,+10].forEach(det => {  
+      const o = c.createOscillator(); o.type='sawtooth';  
+      const g = c.createGain();  
+      o.frequency.setValueAtTime(620, t);  
+      o.detune.setValueAtTime(det, t);  
+      o.frequency.linearRampToValueAtTime(720, t+0.12);  
+      o.frequency.exponentialRampToValueAtTime(150, t+len*0.92);  
+  
+      g.gain.setValueAtTime(0.0001, t);  
+      g.gain.exponentialRampToValueAtTime(0.95, t+0.06);  
+      g.gain.exponentialRampToValueAtTime(0.0001, t+len);  
+  
+      const trem = c.createOscillator(); trem.frequency.value = 13;  
+      const tremAmt = c.createGain(); tremAmt.gain.value = 0.7;  
+      trem.connect(tremAmt.gain); g.connect(tremAmt);  
+  
+      o.connect(g).connect(bus);  
+      trem.start(t); trem.stop(t+len);  
+      o.start(t); o.stop(t+len);  
+    });  
+  
+    const nbuf = c.createBuffer(1, Math.floor(c.sampleRate*len), c.sampleRate);  
+    const d = nbuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;  
+    const n = c.createBufferSource(); n.buffer = nbuf;  
+    const nBP = c.createBiquadFilter(); nBP.type='bandpass'; nBP.frequency.value=2600; nBP.Q.value=6;  
+    const ng = c.createGain();  
+    ng.gain.setValueAtTime(0.001, t+0.08);  
+    ng.gain.exponentialRampToValueAtTime(0.5, t+0.22);  
+    ng.gain.exponentialRampToValueAtTime(0.0001, t+len);  
+    n.connect(nBP).connect(ng).connect(bus);  
+    n.start(t); n.stop(t+len);  
+  
+    setTimeout(()=>{ try{bus.disconnect(); dist.disconnect(); bp.disconnect(); lp.disconnect();}catch(e){} }, (len+0.2)*1000);  
+    return t + len;  
+  }  
+  
+  // ---------- Beat (2s) ----------  
+  function scheduleBeat2s(c, start, out){  
+    const dur = 2.0;  
+    const beat = 0.5; // 120 BPM (quarter = 0.5s)  
+    for(let i=0;i<4;i++){  
+      const t = start + i*beat;  
+      if(i===0 || i===2) kickPlop(c, t, out); else snareCluck(c, t, out);  
+      hatClick(c, t, out);  
+      hatClick(c, t + beat/2, out);  
+    }  
+    return start + dur;  
+  }  
+  
+  // ---------- Alternanza: 3s scream -> 2s beat -> loop ----------  
+  let loopTimer = null, cleanup = null;
+  let isPlaying = false; // toggle stato
+  
+  function playAlternating(){  
+    const c = ac();  
+    if (cleanup) { try{ cleanup(); }catch(e){} cleanup = null; }  
+  
+    const master = c.createGain(); master.gain.value = 0.95;  
+    const softLim = mkDist(c, 12);  
+    const comp = c.createDynamicsCompressor();  
+    comp.threshold.value = -10; comp.knee.value = 8; comp.ratio.value = 6; comp.attack.value = 0.002; comp.release.value = 0.06;  
+    master.connect(softLim).connect(comp).connect(c.destination);  
+  
+    const PERIOD = 5.0; // 3s urlo + 2s beat  
+    let base = c.currentTime + 0.03;  
+  
+    const afterScream = chickenScream3s(c, base, master); // 3.0s  
+    scheduleBeat2s(c, afterScream + 0.05, master);        // 2.0s  
+  
+    loopTimer = setInterval(()=>{  
+      base += PERIOD;  
+      const endS = chickenScream3s(c, base, master);  
+      scheduleBeat2s(c, endS + 0.05, master);  
+    }, PERIOD * 1000);  
+  
+    cleanup = () => {  
+      try{ clearInterval(loopTimer); }catch(e){}  
+      loopTimer = null;  
+      try{ master.disconnect(); softLim.disconnect(); comp.disconnect(); }catch(e){}  
+      try{ c.suspend(); }catch(e){}  
+    };
+    isPlaying = true;
+    btn.textContent = "🛑 STOP THE SCREAM";
   }
-  render();
-
-  // 2) aggiungi subito 1 uovo e sincronizza la griglia
-  const prevCtx = audioCtx;
-  audioCtx = null;               // evita blocchi audio auto
-  addEgg();                      // uovo visivo immediato
-  syncNestVisual(localEggs);     // usa il valore già incrementato sopra
-  audioCtx = prevCtx;
-
-  // 3) suoni: se l’audio è sbloccato festeggia, altrimenti CTA per iOS
-  if (audioCtx && audioCtx.state === 'running') {
-    try { cluck(); setTimeout(plop,140); showRubber(); } catch(e){}
-  } else {
-    const cta = document.createElement('button');
-    cta.textContent = 'Tap to celebrate 🎉🐔';
-    cta.className = 'miniBtn';
-    cta.style.marginTop = '10px';
-    document.querySelector('.controls').appendChild(cta);
-
-    function celebrate(){
-      if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-      if(audioCtx.state==='suspended') audioCtx.resume();
-      cluck(); setTimeout(plop,140); showRubber();
-      cta.remove(); document.removeEventListener('pointerdown', celebrateOnce, true);
-    }
-    const celebrateOnce = () => celebrate();
-    cta.addEventListener('click', celebrate);
-    document.addEventListener('pointerdown', celebrateOnce, true);
+  function stopAlternating(){
+    if (cleanup) { try{ cleanup(); }catch(e){} }
+    cleanup = null;
+    isPlaying = false;
+    btn.textContent = "💥🐔🥚 1$ MAKE IT SCREAM — PLAY THE BEAT 💥🐔🥚";
   }
-
-  // 4) pulizia URL e flag
-  try {
-    history.replaceState({}, document.title, window.location.pathname);
-    localStorage.removeItem('eggscream_pending_payment');
-    lastEl.textContent = new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  } catch(e){}
-}
-
-// Avvia il flusso se rileviamo ritorno pagato
-(function bootPaid() {
-  if (detectPaidReturn()) runPostPaymentFlow();
-})();
-</script>
-
-
-<!-- Analytics Plausible -->
-<script defer data-domain="eggscream.com" src="https://plausible.io/js/script.js"></script>
-
-<script>
-  // Usa lo stesso AudioContext già esistente
-  function clickSound() {
-    const osc = ctx().createOscillator();
-    const gain = ctx().createGain();
-    osc.type = "square";
-    osc.frequency.setValueAtTime(600, ctx().currentTime);
-    gain.gain.setValueAtTime(0.15, ctx().currentTime);
-    osc.connect(gain).connect(ctx().destination);
-    osc.start();
-    osc.stop(ctx().currentTime + 0.1);
-  }
-
-  // Attiva su tutti i bottoni e link collaudati
-  document.querySelectorAll("button, .btn, [role=button]").forEach(el => {
-    el.addEventListener("click", () => {
-      ctx().resume(); // sblocca audio su mobile
-      clickSound();
-    });
-  });
-</script>
-
-</body>
+  
+  // --------- UI: toggle start/stop ----------
+  const btn = document.getElementById('btn');
+  btn.addEventListener('click', () => {
+    if (!isPlaying) playAlternating();
+    else           stopAlternating();
+  });  
+  </script>  
+</body>  
 </html>
+
+
 
 
 
