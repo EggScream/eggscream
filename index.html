@@ -271,38 +271,59 @@
   }
 
   // --------- UI: toggle start/stop ----------
-  const btn = document.getElementById('btn');
-  const celebrateCta = document.getElementById('celebrateCta');
+const btn = document.getElementById('btn');
 
-  // Autostart dopo pagamento (se possibile), altrimenti mostra CTA
-  (async function maybeAutoStart(){
-    const params = new URLSearchParams(location.search);
-    const paid = params.get('success') === '1' && params.get('beat') === '1';
-    if (!paid) return;
+// Crea un piccolo CTA per sbloccare l'audio quando serve
+function showTapToPlay(){
+  // evitiamo duplicati
+  if (document.getElementById('tapToPlay')) return;
+  const cta = document.createElement('button');
+  cta.id = 'tapToPlay';
+  cta.textContent = 'Tap to celebrate 🎉🐔';
+  cta.style.cssText = `
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+    z-index: 9999; padding: 10px 14px; border-radius: 10px;
+    border: 0; cursor: pointer; font-weight: 700;
+    background: #ffe08a; color: #3a2500; box-shadow: 0 6px 18px rgba(0,0,0,.2);
+  `;
+  cta.addEventListener('click', () => {
+    try { ac(); } catch(e){}
+    if (ctx && ctx.state === 'suspended') ctx.resume();
+    // avvia il pezzo alternato (urlo + beat)
+    playAlternating();
+    cta.remove();
+  });
+  document.body.appendChild(cta);
+}
 
-    // pulisci la URL
-    history.replaceState({}, document.title, location.pathname);
+// Autostart dopo pagamento
+const qs = new URLSearchParams(location.search);
+if (qs.get('success') === '1' && qs.get('beat') === '1') {
+  // rimuovi la query dalla URL (pulizia)
+  history.replaceState({}, document.title, location.pathname);
+  // prova a partire subito…
+  ac();
+  if (ctx && ctx.state === 'running') {
+    playAlternating();
+  } else {
+    // …altrimenti mostra il CTA per sbloccare l’audio
+    showTapToPlay();
+  }
+}
 
-    try {
-      await playAlternating();   // prova ad autostartare
-    } catch(e) {
-      // fallback
-    }
+// Comportamento del bottone principale:
+// - se NON sta suonando: lascia aprire la modale (#payModal)
+// - se STA suonando: ferma (e NON aprire la modale)
+btn.addEventListener('click', (e) => {
+  if (!isPlaying) return;         // apri modale di pagamento
+  e.preventDefault();             // blocca l’ancora #payModal
+  stopAlternating();              // ferma audio
+});
 
-    // Se non sta suonando, mostra CTA manuale (autoplay bloccato)
-    if (!isPlaying || (ac().state !== 'running')) {
-      celebrateCta.style.display = 'inline-block';
-    }
-  })();
-
-  // CTA manuale (fallback)
-  celebrateCta.addEventListener('click', playAlternating);
-
-  // Click normale sul bottone principale = solo apertura modale
-  // (il toggle start/stop lo gestiamo solo dopo pagamento)
   </script>
 </body>
 </html>
+
 
 
 
