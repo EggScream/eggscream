@@ -94,16 +94,29 @@
   // ---------- Audio setup ----------
   let ctx;
   function ac(){ if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)(); return ctx; }
-  async function ensureRunning(){
-    const c = ac();
-    if (c.state === 'suspended') { try { await c.resume(); } catch(e){} }
-    if (c.state !== 'running') {
-      await new Promise(res=>{
-        const onChange=()=>{ if(c.state==='running'){ c.removeEventListener('statechange',onChange); res(); } };
-        c.addEventListener('statechange', onChange);
-      });
-    }
-    return c;
+  async function ensureRunning() {
+  if (ctx.state === 'running') return true;
+
+  // Prova a resume, ma non aspettare all’infinito
+  ctx.resume();
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const check = () => {
+      if (ctx.state === 'running' && !done) {
+        done = true;
+        resolve(true);
+      }
+    };
+    ctx.onstatechange = check;
+    setTimeout(() => {
+      if (!done) {
+        done = true;
+        reject(new Error("Autoplay blocked"));
+      }
+    }, 300); // dopo 300ms consideriamo fallito
+  });
+}
+
   }
   function mkDist(c, amt=24){
     const ws = c.createWaveShaper(), n=512, curve=new Float32Array(n);
@@ -277,8 +290,16 @@
   try { history.replaceState({}, document.title, location.pathname); } catch(e){}
 
   // prova ad avviare subito; se l'autoplay è bloccato, mostra TAP
-  try { await playAlternating(); } catch(e){}
-  if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
+  try {
+  await playAlternating();
+} catch(e) {
+  console.warn("Autoplay bloccato:", e);
+  showTapToPlay();   // se Chrome blocca, mostra subito il TAP
+}
+
+if (!isPlaying || (ctx && ctx.state !== 'running')) {
+  showTapToPlay();   // ulteriore sicurezza
+}
 
   // pulizia flag
   try { localStorage.removeItem('eggscreamPending'); } catch(e){}
@@ -302,6 +323,7 @@
   </script>
 </body>
 </html>
+
 
 
 
