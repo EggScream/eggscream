@@ -268,38 +268,45 @@
     });
   }
 
-  // al ritorno: query, referrer o flag → autoplay o TAP
-  (async function maybeAutoStart(){
-    const p = new URLSearchParams(location.search);
+  // al ritorno: query, referrer, o flag → autoplay o TAP
+(async function maybeAutoStart(){
+  const p = new URLSearchParams(location.search);
 
-    // 1) pagato via query (più permissivo: basta success=1)
-    const queryPaid = (p.get('success') === '1');
+  // 1) pagato via query (?success=1)
+  const queryPaid = (p.get('success') === '1');
 
-    // 2) potremmo essere passati da eggscream.com => www.eggscream.com
-    // in quel caso il referrer è eggscream.com (non stripe) ma contiene ancora ?success=1
-    const ref = document.referrer || "";
-    const refHasSuccess = /[?&]success=\b1\b/.test(ref);
+  // 2) referrer con dentro success=1 (es. redirect intermedio)
+  const ref = document.referrer || "";
+  const refHasSuccess = /[?&]success=1\b/.test(ref);
 
-    // 3) oppure veniamo direttamente da stripe.com (senza redirect)
-    const cameFromStripe = /stripe\.com/i.test(ref);
+  // 3) referrer che contiene stripe.com (qualsiasi sottodominio)
+  const cameFromStripe = /stripe\.com/i.test(ref);
 
-    // 4) flag locale messo quando si clicca “Pay with Stripe”
-    let hadPending = false;
-    try { hadPending = localStorage.getItem('eggscreamPending') === '1'; } catch(e){}
+  // 4) flag locale salvato prima di uscire
+  let hadPending = false;
+  try { hadPending = localStorage.getItem('eggscreamPending') === '1'; } catch(e){}
 
-    // se non abbiamo alcun segnale di ritorno da pagamento, non fare nulla
-    if (!(queryPaid || refHasSuccess || cameFromStripe || hadPending)) return;
+  console.log("[eggscream] signals:", {queryPaid, refHasSuccess, cameFromStripe, hadPending});
 
-    // pulisci URL (toglie ?success=1 se presente)
-    try { history.replaceState({}, document.title, location.pathname); } catch(e){}
+  // se nessun segnale → non facciamo nulla
+  if (!(queryPaid || refHasSuccess || cameFromStripe || hadPending)) return;
 
-    // prova ad avviare subito; se l’autoplay è bloccato, mostra TAP
-    try { await playAlternating(); } catch(e){}
-    if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
+  // pulisci URL (toglie ?success=1)
+  try { history.replaceState({}, document.title, location.pathname); } catch(e){}
 
-    // pulizia flag
-    try { localStorage.removeItem('eggscreamPending'); } catch(e){}
-  })();
+  // prova ad avviare subito; se autoplay bloccato, mostra TAP
+  try { 
+    await playAlternating(); 
+  } catch(e) { 
+    console.warn("Autoplay error:", e); 
+  }
+  if (!isPlaying || (ctx && ctx.state !== 'running')) {
+    showTapToPlay();
+  }
+
+  // pulizia flag
+  try { localStorage.removeItem('eggscreamPending'); } catch(e){}
+})();
 
   function showTapToPlay(){
     if (celebrateCta.style.display !== 'inline-block') {
@@ -318,6 +325,7 @@
   </script>
 </body>
 </html>
+
 
 
 
