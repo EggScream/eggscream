@@ -323,8 +323,22 @@
   // --------- PayPal lazy (facoltativo) ----------
   // (lasciato com'era; ricorda di impostare il tuo client-id)
   </script>
+  <button onclick="testBeep()">🔊 Test Beep</button>
+<script>
+function testBeep(){
+  const c = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = c.createOscillator();
+  osc.type = "sine"; 
+  osc.frequency.value = 440; // nota LA
+  osc.connect(c.destination);
+  osc.start();
+  osc.stop(c.currentTime + 1); // suona 1 secondo
+}
+</script>
+
 </body>
 </html>
+
 
 
 
