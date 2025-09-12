@@ -65,8 +65,9 @@
       <h3>Choose your payment</h3>
       <p>💥 This $1 will trigger the screaming beat.</p>
       <div class="payBtns">
-        <!-- Stripe Payment Link: nuova scheda, ritorna con ?success=1&beat=1 -->
+        <!-- Stripe Payment Link: nuova scheda, ritorna con ?success=1&beat=1 (se Stripe conserva i parametri) -->
         <a
+          id="stripeLink"
           href="https://buy.stripe.com/test_dRm8wI5wBf9l21W20P9oc01?success=1&beat=1"
           class="payBtn stripe"
           target="_blank" rel="noopener"
@@ -93,7 +94,6 @@
     if (c.state === 'suspended') {
       try { await c.resume(); } catch(e){}
     }
-    // se ancora non "running", aspetta il cambio stato
     if (c.state !== 'running') {
       await new Promise(res=>{
         const onChange=()=>{ if(c.state==='running'){ c.removeEventListener('statechange',onChange); res(); } };
@@ -231,7 +231,7 @@
   let isPlaying = false;
 
   async function playAlternating(){
-    const c = await ensureRunning(); // << attende il resume
+    const c = await ensureRunning();
     if (cleanup) { try{ cleanup(); }catch(e){} cleanup = null; }
 
     const master = c.createGain(); master.gain.value = 0.95;
@@ -241,7 +241,7 @@
     master.connect(softLim).connect(comp).connect(c.destination);
 
     const PERIOD = 5.0; // 3s urlo + 2s beat
-    let base = c.currentTime + 0.08; // << leggero margine extra
+    let base = c.currentTime + 0.08;
 
     const afterScream = chickenScream3s(c, base, master);
     scheduleBeat2s(c, afterScream + 0.06, master);
@@ -260,7 +260,6 @@
     };
     isPlaying = true;
     btn.textContent = "🛑 STOP THE SCREAM";
-    // se era visibile il CTA, nascondilo
     celebrateCta.style.display = 'none';
   }
   function stopAlternating(){
@@ -271,53 +270,91 @@
   }
 
   // --------- RIFINITURE POST-PAGAMENTO E UI ---------
-const btn = document.getElementById('btn');
+  const btn = document.getElementById('btn');
+  const celebrateCta = document.getElementById('celebrateCta');
+  const stripeLink = document.getElementById('stripeLink');
 
-// 1) Autostart al ritorno da Stripe (se consentito), altrimenti CTA "tap"
-(async function maybeAutoStart(){
-  const p = new URLSearchParams(location.search);
-  const paid = p.get('success') === '1' && p.get('beat') === '1';
-  if (!paid) return;
-
-  // pulisci la URL
-  history.replaceState({}, document.title, location.pathname);
-
-  try {
-    await playAlternating();        // prova a suonare subito (desktop di solito ok)
-  } catch(e) {
-    showTapToPlay();                // fallback se l'audio è bloccato
+  // Flag: prima di aprire Stripe (nuova scheda) salvo l'intento
+  if (stripeLink) {
+    stripeLink.addEventListener('click', () => {
+      try { localStorage.setItem('eggscreamPending','1'); } catch(e){}
+    });
   }
 
-  // se parte ma l'audio è bloccato, mostra comunque la CTA
-  if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
-})();
+  // Autostart al ritorno: se parametri presenti -> prova a suonare.
+  // Se non ci sono (Stripe non li conserva) ma torni da stripe.com o avevi il flag, mostra il TAP.
+  (async function maybeAutoStart(){
+    const p = new URLSearchParams(location.search);
+    const paid = p.get('success') === '1' && p.get('beat') === '1';
+    const cameFromStripe = document.referrer && /stripe\.com/i.test(document.referrer);
+    const hadPending = (()=>{ try{ return localStorage.getItem('eggscreamPending')==='1'; }catch(e){ return false; }})();
 
-// 2) CTA dinamico per sbloccare audio con un tap
-function showTapToPlay(){
-  if (document.getElementById('tapToPlay')) return; // già presente
-  const b = document.createElement('button');
-  b.id = 'tapToPlay';
-  b.textContent = 'Tap to celebrate 🎉🐔';
-  b.className = 'miniBtn';
-  b.style.marginTop = '12px';
-  // mettilo vicino al bottone principale
-  document.querySelector('.inner')?.appendChild(b);
-  b.addEventListener('click', () => {
-    playAlternating();
-    b.remove();
+    if (paid) {
+      history.replaceState({}, document.title, location.pathname);
+      try { await playAlternating(); } catch(e) {}
+      if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
+      try { localStorage.removeItem('eggscreamPending'); }catch(e){}
+      return;
+    }
+
+    if (cameFromStripe || hadPending) {
+      showTapToPlay();
+      try { localStorage.removeItem('eggscreamPending'); }catch(e){}
+    }
+  })();
+
+  // CTA dinamico per sbloccare audio con un tap
+  function showTapToPlay(){
+    const b = document.getElementById('tapToPlay');
+    if (b) return;
+    celebrateCta.style.display = 'inline-block';
+    celebrateCta.onclick = () => { playAlternating(); celebrateCta.style.display='none'; };
+  }
+
+  // Bottone principale: mentre suona diventa STOP (non apre la modale)
+  btn.addEventListener('click', (e) => {
+    if (isPlaying) {
+      e.preventDefault();
+      stopAlternating();
+    }
   });
-}
 
-// 3) Quando STA suonando, il bottone principale diventa STOP (non riapre la modale)
-btn.addEventListener('click', (e) => {
-  if (isPlaying) {
-    e.preventDefault();    // blocca l'ancora #payModal
-    stopAlternating();     // ferma audio
+  // --------- PayPal lazy (render in modale) ----------
+  let paypalLoaded = false;
+  function loadPayPalSDK(){
+    return new Promise((resolve,reject)=>{
+      if (paypalLoaded && window.paypal) return resolve();
+      const s = document.createElement('script');
+      s.src = "https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=USD&intent=capture";
+      s.onload = ()=>{ paypalLoaded = true; resolve(); };
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
   }
-});
-
+  function maybeInitPayPal(){
+    const container = document.getElementById('paypalButtons');
+    if (container && !container.hasChildNodes()) {
+      loadPayPalSDK().then(()=>{
+        window.paypal.Buttons({
+          style: { layout:'vertical', color:'gold', shape:'pill', label:'pay' },
+          createOrder: (data, actions) => actions.order.create({
+            purchase_units: [{ amount: { value: '1.00' } }]
+          }),
+          onApprove: (data, actions) => {
+            return actions.order.capture().then(()=>{
+              location.href = location.pathname + "?success=1&beat=1";
+            });
+          }
+        }).render('#paypalButtons');
+      }).catch(()=>{});
+    }
+  }
+  window.addEventListener('hashchange', ()=>{ if(location.hash==='#payModal') maybeInitPayPal(); });
+  if (location.hash==='#payModal') maybeInitPayPal();
   </script>
 </body>
 </html>
+
+
 
 
