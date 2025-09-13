@@ -271,6 +271,11 @@
   // al ritorno: query, referrer, o flag → autoplay o TAP
 (async function maybeAutoStart(){
   const p = new URLSearchParams(location.search);
+// 🔧 DEBUG: se nell’URL c’è #forceTap, mostra subito il bottone giallo
+  if (location.hash === '#forceTap') {
+    showTapToPlay();
+    return;
+  }
 
   // 1) pagato via query (?success=1)
   const queryPaid = (p.get('success') === '1');
@@ -347,6 +352,7 @@ function testBeep(){
 
 </body>
 </html>
+
 
 
 
