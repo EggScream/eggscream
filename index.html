@@ -321,12 +321,13 @@
       showTapToPlay();
       return;
     }
-// Se dopo ~800ms non sta suonando, mostriamo TAP comunque
+// ⛑️ Safety timer: se entro 1200ms non stiamo suonando o l'AudioContext non è "running", mostra TAP
 setTimeout(() => {
   if (!isPlaying || (ctx && ctx.state !== 'running')) {
     showTapToPlay();
   }
-}, 800);
+}, 1200);
+
 
     if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
 
@@ -357,6 +358,7 @@ setTimeout(() => {
   </script>
 </body>
 </html>
+
 
 
 
