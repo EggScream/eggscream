@@ -386,8 +386,25 @@
   // --------- PayPal lazy (facoltativo) ----------
   // (lasciato com'era; ricorda di impostare il tuo client-id)
   </script>
+  <script>
+  // 🔧 Rimuovi eventuali Service Worker e cache rimasti in giro
+  (function(){
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(r => r.unregister());
+      });
+    }
+    if (window.caches) {
+      caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+    }
+    try { localStorage.removeItem('eggscreamPending'); } catch(e){}
+    try { sessionStorage.clear(); } catch(e){}
+  })();
+</script>
+
 </body>
 </html>
+
 
 
 
