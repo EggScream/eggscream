@@ -73,13 +73,13 @@
       <h3>Choose your payment</h3>
       <p>💥 This $1 will trigger the screaming beat.</p>
       <div class="payBtns">
-        <!-- Stripe Payment Link -->
+        <!-- Stripe Payment Link (stessa scheda) -->
         <a
           id="stripeLink"
           href="https://buy.stripe.com/test_dRm8wI5wBf9l21W20P9oc01?success=1"
           class="payBtn stripe"
-          target="_blank" rel="noopener"
-          >💳 Pay with Stripe</a>
+          target="_self" rel="noopener"
+        >💳 Pay with Stripe</a>
 
         <!-- PayPal (opzionale) -->
         <div id="paypalButtons"></div>
@@ -95,7 +95,7 @@
   let ctx;
   function ac(){ if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)(); return ctx; }
 
-  // Fast-fail: prova a far partire l’audio, se dopo ~300ms è ancora sospeso => consideriamo bloccato
+  // Fast-fail: se dopo ~300ms l'AudioContext non è "running", consideriamo autoplay bloccato
   async function ensureRunning(){
     const c = ac();
     if (c.state === 'running') return c;
@@ -107,18 +107,12 @@
       let settled = false;
       const onChange = () => {
         if (!settled && c.state === 'running') {
-          settled = true;
-          c.removeEventListener('statechange', onChange);
-          resolve(c);
+          settled = true; c.removeEventListener('statechange', onChange); resolve(c);
         }
       };
       c.addEventListener('statechange', onChange);
       setTimeout(()=>{
-        if (!settled) {
-          settled = true;
-          c.removeEventListener('statechange', onChange);
-          reject(new Error('Autoplay blocked'));
-        }
+        if (!settled) { settled = true; c.removeEventListener('statechange', onChange); reject(new Error('Autoplay blocked')); }
       }, 300);
     });
   }
@@ -222,7 +216,7 @@
   let loopTimer = null, cleanup = null, isPlaying = false;
 
   async function playAlternating(){
-    const c = await ensureRunning();  // se non parte in 300ms, lancia errore e verrà mostrato il TAP
+    const c = await ensureRunning(); // se fallisce, verrà gestito a monte
     if (cleanup) { try{ cleanup(); }catch(e){} cleanup = null; }
 
     const master = c.createGain(); master.gain.value = 0.95;
@@ -243,13 +237,17 @@
       scheduleBeat2s(c, endS + 0.06, master);
     }, PERIOD * 1000);
 
-    cleanup = () => { try{ clearInterval(loopTimer); }catch(e){} loopTimer = null;
+    cleanup = () => {
+      try{ clearInterval(loopTimer); }catch(e){} loopTimer = null;
       try{ master.disconnect(); softLim.disconnect(); comp.disconnect(); }catch(e){}
-      try{ c.suspend(); }catch(e){} };
+      try{ c.suspend(); }catch(e){}
+    };
+
     isPlaying = true;
     document.getElementById('btn').textContent = "🛑 STOP THE SCREAM";
     document.getElementById('celebrateCta').style.display = 'none';
   }
+
   function stopAlternating(){
     if (cleanup) { try{ cleanup(); }catch(e){} } cleanup = null;
     isPlaying = false;
@@ -268,105 +266,73 @@
     });
   }
 
-  // al ritorno: query, referrer, o flag → autoplay o TAP
-(async function maybeAutoStart(){
-  const p = new URLSearchParams(location.search);
-// 🔧 DEBUG: se nell’URL c’è #forceTap, mostra subito il bottone giallo
-  if (location.hash === '#forceTap') {
-    showTapToPlay();
-    return;
-  }
-// --- Fallback: se torniamo da Stripe ma l’autoplay è bloccato o lo script non ha girato, mostra il TAP ---
-function havePaymentSignal() {
-  const p = new URLSearchParams(location.search);
-  const queryPaid = (p.get('success') === '1');
-  const ref = document.referrer || "";
-  const refHasSuccess = /[?&]success=\b1\b/.test(ref);
-  const cameFromStripe = /(?:^|\/\/)(?:buy\.|checkout\.)?stripe\.com/i.test(ref);
-  let hadPending = false;
-  try { hadPending = localStorage.getItem('eggscreamPending') === '1'; } catch(e){}
-  return { queryPaid, refHasSuccess, cameFromStripe, hadPending };
-}
-
-async function tryStartOrTap() {
-  // se sta già suonando, non fare nulla
-  if (window.isPlaying) return;
-  try {
-    await playAlternating();              // prova a partire
-  } catch(e) { /* ignore */ }
-  // se non sta suonando o l’audio è ancora sospeso, mostra TAP
-  if (!window.isPlaying || (window.ctx && window.ctx.state !== 'running')) {
-    showTapToPlay();
-  }
-}
-
-function fallbackOnFocus() {
-  const { queryPaid, refHasSuccess, cameFromStripe, hadPending } = havePaymentSignal();
-  // se abbiamo QUALSIASI segnale di ritorno da pagamento, prova a partire o mostra TAP
-  if (queryPaid || refHasSuccess || cameFromStripe || hadPending) {
-    tryStartOrTap();
-  }
-}
-
-// ascolta eventi che si verificano quando torni sulla pagina
-window.addEventListener('focus', fallbackOnFocus);
-window.addEventListener('visibilitychange', () => { if (!document.hidden) fallbackOnFocus(); });
-window.addEventListener('pageshow', fallbackOnFocus);
-
-
-  // 1) pagato via query (?success=1)
-  const queryPaid = (p.get('success') === '1');
-
-  // 2) referrer con dentro success=1 (es. redirect intermedio)
-  const ref = document.referrer || "";
-  const refHasSuccess = /[?&]success=1\b/.test(ref);
-
-  // 3) referrer che contiene stripe.com (qualsiasi sottodominio)
-  const cameFromStripe = /stripe\.com/i.test(ref);
-
-  // 4) flag locale salvato prima di uscire
-  let hadPending = false;
-  try { hadPending = localStorage.getItem('eggscreamPending') === '1'; } catch(e){}
-
-  console.log("[eggscream] signals:", {queryPaid, refHasSuccess, cameFromStripe, hadPending});
-
-  // se nessun segnale → non facciamo nulla
-  if (!(queryPaid || refHasSuccess || cameFromStripe || hadPending)) return;
-
-  // pulisci URL (toglie ?success=1)
-  try { history.replaceState({}, document.title, location.pathname); } catch(e){}
-
-  // prova ad avviare subito; se autoplay bloccato, mostra TAP
-  try { 
-    await playAlternating(); 
-  } catch(e) { 
-    console.warn("Autoplay error:", e); 
-  }
-  if (!isPlaying || (ctx && ctx.state !== 'running')) {
-    showTapToPlay();
+  // --- helper: segnali che indicano "siamo tornati dal pagamento"
+  function havePaymentSignal() {
+    const p = new URLSearchParams(location.search);
+    const queryPaid = (p.get('success') === '1');
+    const ref = document.referrer || "";
+    const refHasSuccess = /[?&]success=\b1\b/.test(ref);
+    const cameFromStripe = /(?:^|\/\/)(?:buy\.|checkout\.)?stripe\.com/i.test(ref);
+    let hadPending = false;
+    try { hadPending = localStorage.getItem('eggscreamPending') === '1'; } catch(e){}
+    return { queryPaid, refHasSuccess, cameFromStripe, hadPending };
   }
 
-  // pulizia flag
-  try { localStorage.removeItem('eggscreamPending'); } catch(e){}
-})();
+  async function tryStartOrTap() {
+    if (isPlaying) return;
+    try { await playAlternating(); } catch(e) {}
+    if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
+  }
+
+  // --- Fallback: se rientri e lo script non ha girato, reagisci su focus/visibilità
+  function fallbackOnFocus() {
+    const sig = havePaymentSignal();
+    if (sig.queryPaid || sig.refHasSuccess || sig.cameFromStripe || sig.hadPending) {
+      tryStartOrTap();
+    }
+  }
+  window.addEventListener('focus', fallbackOnFocus);
+  window.addEventListener('visibilitychange', () => { if (!document.hidden) fallbackOnFocus(); });
+  window.addEventListener('pageshow', fallbackOnFocus);
+
+  // --- Autostart al rientro
+  (async function maybeAutoStart(){
+    // Debug: forza TAP
+    if (location.hash === '#forceTap') { showTapToPlay(); return; }
+
+    const { queryPaid, refHasSuccess, cameFromStripe, hadPending } = havePaymentSignal();
+    console.log("[eggscream] signals:", { queryPaid, refHasSuccess, cameFromStripe, hadPending });
+
+    if (!(queryPaid || refHasSuccess || cameFromStripe || hadPending)) return;
+
+    try { history.replaceState({}, document.title, location.pathname); } catch(e){}
+
+    try {
+      await playAlternating();
+    } catch(e) {
+      // Autoplay bloccato → mostriamo TAP
+      showTapToPlay();
+      return;
+    }
+
+    if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
+
+    try { localStorage.removeItem('eggscreamPending'); } catch(e){}
+  })();
 
   function showTapToPlay(){
-  if (celebrateCta.style.display !== 'inline-block') {
-    celebrateCta.style.display = 'inline-block';
-    celebrateCta.onclick = async () => {
-      try {
-        const c = ac();            // garantisce che ctx esista
-        try { await c.resume(); } catch(e){}
-        await playAlternating();   // avvia urlo + beat
-      } catch(e){
-        console.error(e);
-      }
-      celebrateCta.style.display = 'none';
-    };
+    if (celebrateCta.style.display !== 'inline-block') {
+      celebrateCta.style.display = 'inline-block';
+      celebrateCta.onclick = async () => {
+        try {
+          const c = ac();           // crea ctx se mancava
+          try { await c.resume(); } catch(e){}
+          await playAlternating();  // parte davvero
+        } catch(e){ console.error(e); }
+        celebrateCta.style.display = 'none';
+      };
+    }
   }
-}
-
-
 
   // mentre suona, il bottone principale diventa STOP (non riapre la modale)
   btn.addEventListener('click', (e) => {
@@ -376,21 +342,10 @@ window.addEventListener('pageshow', fallbackOnFocus);
   // --------- PayPal lazy (facoltativo) ----------
   // (lasciato com'era; ricorda di impostare il tuo client-id)
   </script>
-  <button onclick="testBeep()">🔊 Test Beep</button>
-<script>
-function testBeep(){
-  const c = new (window.AudioContext || window.webkitAudioContext)();
-  const osc = c.createOscillator();
-  osc.type = "sine"; 
-  osc.frequency.value = 440; // nota LA
-  osc.connect(c.destination);
-  osc.start();
-  osc.stop(c.currentTime + 1); // suona 1 secondo
-}
-</script>
-
 </body>
 </html>
+
+
 
 
 
