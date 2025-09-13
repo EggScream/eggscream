@@ -318,8 +318,9 @@
     celebrateCta.style.display = 'inline-block';
     celebrateCta.onclick = async () => {
       try {
-        await ctx.resume();        // 🔑 sblocca l'audio al TAP
-        await playAlternating();   // e poi avvia il beat
+        const c = ac();            // garantisce che ctx esista
+        try { await c.resume(); } catch(e){}
+        await playAlternating();   // avvia urlo + beat
       } catch(e){
         console.error(e);
       }
@@ -327,6 +328,7 @@
     };
   }
 }
+
 
 
   // mentre suona, il bottone principale diventa STOP (non riapre la modale)
@@ -352,6 +354,7 @@ function testBeep(){
 
 </body>
 </html>
+
 
 
 
