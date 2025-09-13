@@ -309,11 +309,20 @@
 })();
 
   function showTapToPlay(){
-    if (celebrateCta.style.display !== 'inline-block') {
-      celebrateCta.style.display = 'inline-block';
-      celebrateCta.onclick = () => { playAlternating(); celebrateCta.style.display='none'; };
-    }
+  if (celebrateCta.style.display !== 'inline-block') {
+    celebrateCta.style.display = 'inline-block';
+    celebrateCta.onclick = async () => {
+      try {
+        await ctx.resume();        // 🔑 sblocca l'audio al TAP
+        await playAlternating();   // e poi avvia il beat
+      } catch(e){
+        console.error(e);
+      }
+      celebrateCta.style.display = 'none';
+    };
   }
+}
+
 
   // mentre suona, il bottone principale diventa STOP (non riapre la modale)
   btn.addEventListener('click', (e) => {
@@ -338,6 +347,7 @@ function testBeep(){
 
 </body>
 </html>
+
 
 
 
