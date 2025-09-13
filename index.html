@@ -321,6 +321,12 @@
       showTapToPlay();
       return;
     }
+// Se dopo ~800ms non sta suonando, mostriamo TAP comunque
+setTimeout(() => {
+  if (!isPlaying || (ctx && ctx.state !== 'running')) {
+    showTapToPlay();
+  }
+}, 800);
 
     if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
 
@@ -351,6 +357,7 @@
   </script>
 </body>
 </html>
+
 
 
 
