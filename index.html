@@ -276,6 +276,43 @@
     showTapToPlay();
     return;
   }
+// --- Fallback: se torniamo da Stripe ma l’autoplay è bloccato o lo script non ha girato, mostra il TAP ---
+function havePaymentSignal() {
+  const p = new URLSearchParams(location.search);
+  const queryPaid = (p.get('success') === '1');
+  const ref = document.referrer || "";
+  const refHasSuccess = /[?&]success=\b1\b/.test(ref);
+  const cameFromStripe = /(?:^|\/\/)(?:buy\.|checkout\.)?stripe\.com/i.test(ref);
+  let hadPending = false;
+  try { hadPending = localStorage.getItem('eggscreamPending') === '1'; } catch(e){}
+  return { queryPaid, refHasSuccess, cameFromStripe, hadPending };
+}
+
+async function tryStartOrTap() {
+  // se sta già suonando, non fare nulla
+  if (window.isPlaying) return;
+  try {
+    await playAlternating();              // prova a partire
+  } catch(e) { /* ignore */ }
+  // se non sta suonando o l’audio è ancora sospeso, mostra TAP
+  if (!window.isPlaying || (window.ctx && window.ctx.state !== 'running')) {
+    showTapToPlay();
+  }
+}
+
+function fallbackOnFocus() {
+  const { queryPaid, refHasSuccess, cameFromStripe, hadPending } = havePaymentSignal();
+  // se abbiamo QUALSIASI segnale di ritorno da pagamento, prova a partire o mostra TAP
+  if (queryPaid || refHasSuccess || cameFromStripe || hadPending) {
+    tryStartOrTap();
+  }
+}
+
+// ascolta eventi che si verificano quando torni sulla pagina
+window.addEventListener('focus', fallbackOnFocus);
+window.addEventListener('visibilitychange', () => { if (!document.hidden) fallbackOnFocus(); });
+window.addEventListener('pageshow', fallbackOnFocus);
+
 
   // 1) pagato via query (?success=1)
   const queryPaid = (p.get('success') === '1');
@@ -354,6 +391,7 @@ function testBeep(){
 
 </body>
 </html>
+
 
 
 
