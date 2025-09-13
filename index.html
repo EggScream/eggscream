@@ -73,7 +73,7 @@
       <h3>Choose your payment</h3>
       <p>💥 This $1 will trigger the screaming beat.</p>
       <div class="payBtns">
-        <!-- Stripe Payment Link (stessa scheda) -->
+        <!-- Stripe Payment Link: stessa scheda -->
         <a
           id="stripeLink"
           href="https://buy.stripe.com/test_dRm8wI5wBf9l21W20P9oc01?success=1"
@@ -93,9 +93,14 @@
   <script>
   // ---------- Audio setup ----------
   let ctx;
-  function ac(){ if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)(); return ctx; }
+  function ac(){
+    if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)();
+    // esponi per debug
+    window.ctx = ctx;
+    return ctx;
+  }
 
-  // Fast-fail: se dopo ~300ms l'AudioContext non è "running", consideriamo autoplay bloccato
+  // Fast-fail: prova a partire; se dopo ~300ms non è "running" => consideriamo bloccato
   async function ensureRunning(){
     const c = ac();
     if (c.state === 'running') return c;
@@ -107,12 +112,18 @@
       let settled = false;
       const onChange = () => {
         if (!settled && c.state === 'running') {
-          settled = true; c.removeEventListener('statechange', onChange); resolve(c);
+          settled = true;
+          c.removeEventListener('statechange', onChange);
+          resolve(c);
         }
       };
       c.addEventListener('statechange', onChange);
       setTimeout(()=>{
-        if (!settled) { settled = true; c.removeEventListener('statechange', onChange); reject(new Error('Autoplay blocked')); }
+        if (!settled) {
+          settled = true;
+          c.removeEventListener('statechange', onChange);
+          reject(new Error('Autoplay blocked'));
+        }
       }, 300);
     });
   }
@@ -216,7 +227,7 @@
   let loopTimer = null, cleanup = null, isPlaying = false;
 
   async function playAlternating(){
-    const c = await ensureRunning(); // se fallisce, verrà gestito a monte
+    const c = await ensureRunning();  // se non parte, lancia e NON segna isPlaying
     if (cleanup) { try{ cleanup(); }catch(e){} cleanup = null; }
 
     const master = c.createGain(); master.gain.value = 0.95;
@@ -237,17 +248,13 @@
       scheduleBeat2s(c, endS + 0.06, master);
     }, PERIOD * 1000);
 
-    cleanup = () => {
-      try{ clearInterval(loopTimer); }catch(e){} loopTimer = null;
+    cleanup = () => { try{ clearInterval(loopTimer); }catch(e){} loopTimer = null;
       try{ master.disconnect(); softLim.disconnect(); comp.disconnect(); }catch(e){}
-      try{ c.suspend(); }catch(e){}
-    };
-
+      try{ c.suspend(); }catch(e){} };
     isPlaying = true;
     document.getElementById('btn').textContent = "🛑 STOP THE SCREAM";
     document.getElementById('celebrateCta').style.display = 'none';
   }
-
   function stopAlternating(){
     if (cleanup) { try{ cleanup(); }catch(e){} } cleanup = null;
     isPlaying = false;
@@ -344,6 +351,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 
