@@ -90,44 +90,40 @@
   </div>
   <!-- ======================================================== -->
 
-  <script>
+ <script>
   // ---------- Audio setup ----------
   let ctx;
   function ac(){
     if(!ctx) ctx = new (window.AudioContext||window.webkitAudioContext)();
-    // esponi per debug
-    window.ctx = ctx;
+    window.ctx = ctx; // per debug
     return ctx;
   }
 
-  // Fast-fail robusta: risolve SOLO se davvero running, altrimenti reject.
+  // Attendi che l'audio sia "running", più tollerante (1200ms)
   async function ensureRunning(){
     const c = ac();
-
     if (c.state === 'running') return c;
 
-    try { await c.resume(); } catch(e) {}
+    try { await c.resume(); } catch(e){}
     if (c.state === 'running') return c;
 
     return new Promise((resolve, reject)=>{
-      let done = false;
+      let settled = false;
       const onChange = () => {
-        if (!done && c.state === 'running') {
-          done = true;
+        if (!settled && c.state === 'running') {
+          settled = true;
           c.removeEventListener('statechange', onChange);
           resolve(c);
         }
       };
       c.addEventListener('statechange', onChange);
-
-      // dopo 500ms consideriamo bloccato
-      setTimeout(() => {
-        if (!done) {
-          done = true;
+      setTimeout(()=>{
+        if (!settled) {
+          settled = true;
           c.removeEventListener('statechange', onChange);
           reject(new Error('Autoplay blocked'));
         }
-      }, 500);
+      }, 1200); // <— da 300 a 1200
     });
   }
 
@@ -226,23 +222,11 @@
     return start + dur;
   }
 
-  // helper UI
-  function resetUIToIdle(){
-    isPlaying = false;
-    document.getElementById('btn').textContent = "💥🐔🥚 1$ MAKE IT SCREAM — PLAY THE BEAT 💥🐔🥚";
-  }
-
   // ---------- Alternanza: 3s scream -> 2s beat -> loop ----------
   let loopTimer = null, cleanup = null, isPlaying = false;
 
   async function playAlternating(){
-    const c = await ensureRunning();
-
-    // se NON è running → non partire e lasciare UI in idle
-    if (c.state !== 'running') {
-      throw new Error('AudioContext not running');
-    }
-
+    const c = await ensureRunning();  // se non riesce, lancia e NON setta isPlaying
     if (cleanup) { try{ cleanup(); }catch(e){} cleanup = null; }
 
     const master = c.createGain(); master.gain.value = 0.95;
@@ -263,30 +247,18 @@
       scheduleBeat2s(c, endS + 0.06, master);
     }, PERIOD * 1000);
 
-    cleanup = () => {
-      try{ clearInterval(loopTimer); }catch(e){} loopTimer = null;
+    cleanup = () => { try{ clearInterval(loopTimer); }catch(e){} loopTimer = null;
       try{ master.disconnect(); softLim.disconnect(); comp.disconnect(); }catch(e){}
-      try{ c.suspend(); }catch(e){}
-    };
+      try{ c.suspend(); }catch(e){} };
 
-    // SOLO ora metti lo stato "partito"
     isPlaying = true;
     document.getElementById('btn').textContent = "🛑 STOP THE SCREAM";
     document.getElementById('celebrateCta').style.display = 'none';
-
-    // micro-guardia: se per assurdo torna sospeso subito, torna in idle e mostra TAP
-    setTimeout(() => {
-      if (c.state !== 'running') {
-        resetUIToIdle();
-        showTapToPlay();
-      }
-    }, 50);
   }
-
   function stopAlternating(){
-    if (cleanup) { try{ cleanup(); }catch(e){} }
-    cleanup = null;
-    resetUIToIdle();
+    if (cleanup) { try{ cleanup(); }catch(e){} } cleanup = null;
+    isPlaying = false;
+    document.getElementById('btn').textContent = "💥🐔🥚 1$ MAKE IT SCREAM — PLAY THE BEAT 💥🐔🥚";
   }
 
   // --------- Post-pagamento & UI ---------
@@ -301,7 +273,7 @@
     });
   }
 
-  // --- helper: segnali che indicano "siamo tornati dal pagamento"
+  // Segnali di "rientro da pagamento"
   function havePaymentSignal() {
     const p = new URLSearchParams(location.search);
     const queryPaid = (p.get('success') === '1');
@@ -313,79 +285,43 @@
     return { queryPaid, refHasSuccess, cameFromStripe, hadPending };
   }
 
-  async function tryStartOrTap() {
-    if (isPlaying) return;
-    try { await playAlternating(); } catch(e) {}
-    if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
-  }
-
-  // --- Fallback: se rientri e lo script non ha girato, reagisci su focus/visibilità
-  function fallbackOnFocus() {
-    const sig = havePaymentSignal();
-    if (sig.queryPaid || sig.refHasSuccess || sig.cameFromStripe || sig.hadPending) {
-      tryStartOrTap();
-    }
-  }
-  window.addEventListener('focus', fallbackOnFocus);
-  window.addEventListener('visibilitychange', () => { if (!document.hidden) fallbackOnFocus(); });
-  window.addEventListener('pageshow', fallbackOnFocus);
-
-  // --- Autostart al rientro
-  (async function maybeAutoStart(){
-    // Debug: forza TAP con #forceTap
-    if (location.hash === '#forceTap') { showTapToPlay(); return; }
-
-    const { queryPaid, refHasSuccess, cameFromStripe, hadPending } = havePaymentSignal();
-    console.log("[eggscream] signals:", { queryPaid, refHasSuccess, cameFromStripe, hadPending });
-
-    if (!(queryPaid || refHasSuccess || cameFromStripe || hadPending)) return;
-
-    try { history.replaceState({}, document.title, location.pathname); } catch(e){}
-
-    try {
-      await playAlternating();
-    } catch(e) {
-      // Autoplay bloccato → UI NON deve passare a STOP
-      resetUIToIdle();
-      showTapToPlay();
-      return;
-    }
-
-    // ⛑️ Safety timer: se entro 1200ms non stiamo suonando o l'AudioContext non è "running", mostra TAP e reset
-    setTimeout(() => {
-      if (!isPlaying || (ctx && ctx.state !== 'running')) {
-        resetUIToIdle();
-        showTapToPlay();
-      }
-    }, 1200);
-
-    if (!isPlaying || (ctx && ctx.state !== 'running')) showTapToPlay();
-
-    try { localStorage.removeItem('eggscreamPending'); } catch(e){}
-  })();
-
+  // Mostra TAP e gestisci lo sblocco
   function showTapToPlay(){
     if (celebrateCta.style.display !== 'inline-block') {
       celebrateCta.style.display = 'inline-block';
       celebrateCta.onclick = async () => {
         try {
-          const c = ac();           // crea ctx se mancava
+          const c = ac();            // crea ctx
           try { await c.resume(); } catch(e){}
-          await playAlternating();  // parte davvero
+          await new Promise(r=>setTimeout(r,50)); // piccolo respiro
+          await playAlternating();   // parte davvero
         } catch(e){ console.error(e); }
         celebrateCta.style.display = 'none';
       };
     }
   }
 
+  // Autostart al rientro → **NON** suoniamo da soli: mostriamo TAP
+  (function maybeAutoStart(){
+    if (location.hash === '#forceTap') { showTapToPlay(); return; }
+
+    const { queryPaid, refHasSuccess, cameFromStripe, hadPending } = havePaymentSignal();
+    console.log("[eggscream] signals:", { queryPaid, refHasSuccess, cameFromStripe, hadPending });
+
+    if (queryPaid || refHasSuccess || cameFromStripe || hadPending) {
+      // pulisci URL ma NON auto-play
+      try { history.replaceState({}, document.title, location.pathname); } catch(e){}
+      showTapToPlay();
+      try { localStorage.removeItem('eggscreamPending'); } catch(e){}
+    }
+  })();
+
   // mentre suona, il bottone principale diventa STOP (non riapre la modale)
   btn.addEventListener('click', (e) => {
     if (isPlaying) { e.preventDefault(); stopAlternating(); }
   });
+</script>
 
-  // --------- PayPal lazy (facoltativo) ----------
-  // (lasciato com'era; ricorda di impostare il tuo client-id)
-  </script>
   <script>
   // 🔧 Rimuovi eventuali Service Worker e cache rimasti in giro
   (function(){
@@ -404,6 +340,7 @@
 
 </body>
 </html>
+
 
 
 
