@@ -238,7 +238,7 @@
     // >>> PATCH: device flags  
     const IS_MOBILE = (('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0) ||
                        (window.matchMedia && window.matchMedia('(pointer:coarse)').matches));
-    const VOICE_BUDGET = IS_MOBILE ? 22 : 120; // più delirio su desktop
+    const VOICE_BUDGET = IS_MOBILE ? 28 : 120; // più delirio su desktop
     let VOICES_NOW = 0;
 
     // mostra i controlli solo se c'è ?success=1 nell'URL  
@@ -259,7 +259,8 @@
     const LANES = [12, 31, 50, 69, 88];  
 
     function ac(){ 
-      if(!ctx || ctx.state==='closed') ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive', sampleRate:44100}); 
+      // sampleRate non forzato → meno latenza su Android
+      if(!ctx || ctx.state==='closed') ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'}); 
       return ctx; 
     }  
     function onTimer(fn, ms){ const id=setTimeout(fn, ms); timeouts.push(id); return id; }  
@@ -340,11 +341,11 @@
     }
     function getEggEl(){
       for (const e of eggPool){ if (e.style.display==='none'){ e.style.display=''; return e; } }
-      return eggPool[0];
+    return eggPool[0];
     }
     function releaseEggEl(e){ e.style.display='none'; e.textContent='🥚'; e.style.animation='none'; void e.offsetWidth; }
 
-    // >>> PATCH: pool mini "aa" (riduce jank) + throttle 26ms
+    // >>> PATCH: pool mini "aa" (riduce jank) + animationend + throttle 24ms
     const AA_POOL_SIZE = IS_MOBILE ? 16 : 24;
     const aaPool = [];
     function initAAPool(){
@@ -352,6 +353,7 @@
       for(let i=0;i<AA_POOL_SIZE;i++){
         const s=document.createElement('span');
         s.className='miniAA'; s.textContent='aa'; s.style.display='none';
+        s.addEventListener('animationend', ()=> releaseAAEl(s));
         stage.appendChild(s);
         aaPool.push(s);
       }
@@ -399,7 +401,7 @@
     function babyTherapyAA(c, t, out, {  
       len=0.34, pitch=1.6, gain=0.62, detCents=10, tremHz=14, distAmt=18, voices=2, cluster=2, clusterGap=0.035  
     } = {}){  
-      if (IS_MOBILE){ gain *= 1.0; }
+      if (IS_MOBILE){ gain *= 1.10; len = Math.max(0.28, len - 0.06); }
       for (let k=0;k<cluster;k++){  
         if (VOICES_NOW > VOICE_BUDGET) break;
         const tt=t+k*clusterGap;  
@@ -452,11 +454,11 @@
       }  
     }  
 
-    // ---- mini “aa” visual con pool + throttle 26ms
+    // ---- mini “aa” visual con pool + throttle 24ms
     function spawnMiniAAnearEl(el){
       initAAPool();
       const now=performance.now();
-      if (IS_MOBILE && now - lastAATime < 26) return;
+      if (IS_MOBILE && now - lastAATime < 24) return;
       lastAATime=now;
       const s=getAAEl();
       const r=el.getBoundingClientRect(), rs=stage.getBoundingClientRect();
@@ -501,7 +503,7 @@
       const d = nb.getChannelData(0);
       for (let i=0;i<d.length;i++){ const x=i/d.length; d[i]=(Math.random()*2-1)*(1-x)*(1-x); }
       const n = c.createBufferSource(); n.buffer = nb;
-      const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 220;
+      const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = IS_MOBILE ? 260 : 220;
       const g  = c.createGain();
       g.gain.setValueAtTime(0.0001, t);
       g.gain.exponentialRampToValueAtTime(IS_MOBILE ? 1.05 : 1.10, t + 0.006);
@@ -647,8 +649,12 @@
       return c;  
     }  
 
-    function startLoop(){  
-      const c=ensureMaster();  
+    // >>> START immediato, senza preroll, master rialzato prima del primo colpo
+    async function startLoop(){  
+      const c = ensureMaster();
+      try { await c.resume(); } catch(e) {}
+      ensureAudioUnlocked();
+
       if (cleanup) { try{ cleanup(); }catch(e){} }  
       clearAllTimers();  
       if (loopTimer) { clearInterval(loopTimer); loopTimer=null; }  
@@ -658,17 +664,29 @@
       initAAPool();
       VOICES_NOW = 0; // reset budget audio su start
 
-      let base=c.currentTime+0.08;  
-      stage.classList.add('playing'); restartProgress();  
-      transientPunch(1.05);
+      stage.classList.add('playing'); 
+      restartProgress();  
+
+      // rialza SUBITO il master
+      try{
+        const now = c.currentTime + 0.001;
+        master.gain.cancelScheduledValues(now);
+        master.gain.setValueAtTime(IS_MOBILE ? 1.25 : 1.12, now);
+      }catch(e){}
+
+      // micro feedback immediato
+      hatClick(c, c.currentTime + 0.005, master, IS_MOBILE ? 0.36 : 0.30);
+
+      const base = c.currentTime + 0.01; // niente 80ms di preroll
+      transientPunch(1.08);
 
       const afterS=chickenScream3s(c, base, master);  
       scheduleMeasure(c, afterS+0.06, master);  
 
       loopTimer=setInterval(()=>{  
-        base += 5.0;  
+        const nextBase = c.currentTime; // ancorato al tempo reale per stabilità
         restartProgress();  
-        const endS=chickenScream3s(c, base, master);  
+        const endS=chickenScream3s(c, nextBase, master);  
         scheduleMeasure(c, endS+0.06, master);  
       }, 5000);  
 
@@ -683,9 +701,10 @@
           master.gain.linearRampToValueAtTime(0.0001, now + 0.08);  
         }catch(e){}  
         // reset pool visivo per evitare “blocco” alla ripartenza
-        eggPool.forEach(e => { try{ releaseEggEl(e); }catch(_){} });
-        aaPool.forEach(s => { try{ releaseAAEl(s); }catch(_){} });
+        eggPool.forEach(e => { try{ e.style.animation='none'; releaseEggEl(e); }catch(_){} });
+        aaPool.forEach(s => { try{ s.style.animation='none'; releaseAAEl(s); }catch(_){} });
         VOICES_NOW = 0; // azzera contatore voci
+        MEASURE = 0;    // riallinea pattern
         stage.classList.remove('playing'); setScream(false);  
       };  
 
@@ -697,12 +716,15 @@
       startBtn.style.display='inline-block'; stopBtn.style.display='none';  
     }  
 
-    // EGGSplosion (anche a loop fermo) — più delirio su desktop, forte e pulito su mobile  
+    // EGGSplosion (anche a loop fermo) — scheduling dopo resume nel prossimo tick
     function triggerEggsplosionBurst(){  
       const c=ensureMaster();  
       ensureAudioUnlocked();
-      if (c.resume) { try{ c.resume(); }catch(e){} }
+      if (c.state !== 'running' && c.resume) { try{ c.resume(); }catch(e){} }
+      setTimeout(()=>{ _doEggBurst(c); }, 0);
+    }
 
+    function _doEggBurst(c){
       initEggPool();  
       initAAPool();
       transientPunch(1.12);  
@@ -728,16 +750,25 @@
           }  
         }  
       }  
-    }  
+    }
 
-    // >>> eventi: pointerdown (latency zero) + unlock su primo gesto
+    // >>> eventi: pointerdown (latency zero) + unlock su primi gesti
     if (startBtn){  
       startBtn.addEventListener('pointerdown', startLoop, {passive:true});  
       stopBtn .addEventListener('pointerdown', stopLoop,  {passive:true});  
       eggBtn  .addEventListener('pointerdown', triggerEggsplosionBurst, {passive:true});  
-      startBtn.addEventListener('pointerdown', ()=>{ ensureMaster(); ensureAudioUnlocked(); ac().resume?.(); }, {passive:true, once:true});
-      eggBtn  .addEventListener('pointerdown', ()=>{ ensureMaster(); ensureAudioUnlocked(); ac().resume?.(); }, {passive:true, once:true});
+
+      // Sblocco/Resume robusto su click/touchend una tantum
+      ['click','touchend'].forEach(evt=>{
+        startBtn.addEventListener(evt, ()=>{ ensureMaster(); ensureAudioUnlocked(); ac().resume?.(); }, {passive:true, once:true});
+        eggBtn  .addEventListener(evt, ()=>{ ensureMaster(); ensureAudioUnlocked(); ac().resume?.(); }, {passive:true, once:true});
+      });
     }  
+
+    // Sblocco a livello documento (prima interazione ovunque)
+    ['touchstart','click'].forEach(evt=>{
+      document.addEventListener(evt, ()=>{ ensureAudioUnlocked(); ac().resume?.(); }, {passive:true, once:true});
+    });
 
     // >>> se si torna visibili, riprendi l’audio  
     document.addEventListener('visibilitychange', () => {
@@ -750,6 +781,8 @@
   })();  
   </script>  </body>  
 </html> 
+
+
 
 
 
