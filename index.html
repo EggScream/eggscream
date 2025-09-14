@@ -123,7 +123,7 @@
     .miniAA{ position:absolute; font-weight:900; font-size:14px; color:#e11; text-shadow:0 1px 0 #fff,1px 1px 0 rgba(0,0,0,.14); opacity:0; z-index:4 }
     @keyframes aaPop{ 0%{transform:translateY(0) scale(.8);opacity:0} 30%{opacity:1} 100%{transform:translateY(-8px) scale(1.06);opacity:0} }
 
-    /* Pulsantone giallo */
+    /* Pulsantone giallo + pulse rosso ogni ~2s */
     .cta{
       position:relative; display:inline-block; margin-top:22px; padding:1.05rem 1.35rem;
       background:var(--yellow); color:#111; text-decoration:none;
@@ -145,13 +145,13 @@
     .disclaimers{ margin:14px auto 0; max-width:680px; list-style:none; padding:0; color:#333; font-weight:700; font-size:clamp(12px,2.6vw,14px) }
     .disclaimers li{ margin:.25rem 0 }
 
-    /* Barra di progresso */
+    /* Barra di progresso sottile (sopra stage, opzionale) */
     .measure{position:absolute; left:0; right:0; top:0; height:6px; background:rgba(0,0,0,.06)}
     .bar{position:absolute; left:0; top:0; bottom:0; width:0; background:linear-gradient(90deg,#ff8a8a 0 60%, #88c7ff 60% 100%); border-bottom-right-radius:6px}
     .playing .bar{ animation:measure 5s linear infinite }
     @keyframes measure{from{width:0} to{width:100%}}
 
-    /* Controlli post-pagamento */
+    /* Controlli post-pagamento (restano invisibili finché non success=1) */
     .controls{ display:none; gap:10px; justify-content:center; margin:16px 0 0 }
     .controls .btn{ border:3px solid #111; background:#fff; padding:.6rem .9rem; border-radius:12px; font-weight:900; cursor:pointer }
     .controls .btn:active{ transform:translateY(1px) }
@@ -217,7 +217,7 @@
         <li>As American as fried chicken at 3 AM.</li>
       </ul>
 
-      <!-- Controlli post-pagamento -->
+      <!-- Controlli che compaiono post-pagamento -->
       <div class="controls" id="controls">
         <button id="startBtn" class="btn">🔊 Start Beat</button>
         <button id="stopBtn"  class="btn" style="display:none">🛑 Stop</button>
@@ -266,6 +266,10 @@
     // ===== Stato audio / scheduling =====
     let ctx = null, loopTimer = null, cleanup = null, MEASURE = 0;
     let master = null, preSat=null, hardLim = null, comp = null;
+
+    // PATCH state
+    let STOPPED = false;                 // per burst udibile a loop fermo
+    let PRIORITY_BOOST_UNTIL = 0;       // beat priority dopo EGGSplosion
 
     // TIMER AUTO-CLEANUP
     let activeTimers = new Set();
@@ -390,7 +394,7 @@
     }
     function getAAEl(){
       for (const s of aaPool){ if (s.style.display==='none'){ s.style.display=''; return s; } }
-      return aaPool[0];
+    return aaPool[0];
     }
     function releaseAAEl(s){ s.style.display='none'; s.style.animation='none'; void s.offsetWidth; }
 
@@ -412,7 +416,7 @@
       o.frequency.setValueAtTime(750,t);
       o.frequency.exponentialRampToValueAtTime(300,t+0.07);
       g.gain.setValueAtTime(0.95,t);
-      g.gain.exponentialRampToValueAtTime(0.0001,t+0.1);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.1);
       o.connect(g).connect(out);
       trackSource(o);
       o.start(t); o.stop(t+0.11);
@@ -464,7 +468,7 @@
           g.gain.exponentialRampToValueAtTime(0.95,tt+0.035);
           g.gain.exponentialRampToValueAtTime(0.0001,tt+len);
 
-          const trem=c.createOscillator(); trem.frequency.value=13;
+          const trem=c.createOscillator(); trem.frequency.value=tremHz;
           const tremAmt=c.createGain(); tremAmt.gain.value=0.7;
           trem.connect(tremAmt.gain); g.connect(tremAmt);
           o.connect(g).connect(sum);
@@ -510,8 +514,35 @@
       onTimer(()=>releaseAAEl(s), 260);
     }
 
-    // Uova + schiusa (funzioni di spawn)
+    // Uova + schiusa
     let hatchTimers = new Set();
+    function dropEggAt(lanePct, at, hatchMode){
+      const c=ac(); const ms=Math.max(0,(at - c.currentTime)*1000);
+      onTimer(()=>{
+        const e=getEggEl();
+        const size=30 + Math.round(Math.random()*8);
+        e.style.fontSize = size+'px';
+        e.style.left = `calc(${lanePct}% - ${size/2}px)`;
+        e.style.setProperty('--x', (Math.random()*8 - 4) + 'px');
+        e.style.animation='none'; void e.offsetWidth;
+        e.style.animation='fall 1.12s linear forwards';
+
+        if (hatchMode){
+          if (hatchMode==='air'){
+            const id = onTimer(()=>{ e.textContent='🐣'; spawnMiniAAnearEl(e,'beat'); hatchTimers.delete(id); }, 480);
+            hatchTimers.add(id);
+            if (master) babyTherapyAA(c, c.currentTime+0.48, master, { cluster:2, voices:2, pitch:1.65 });
+          } else {
+            const id = onTimer(()=>{ e.textContent='🐣'; spawnMiniAAnearEl(e,'beat'); hatchTimers.delete(id); }, 1080);
+            hatchTimers.add(id);
+            if (master) babyTherapyAA(c, c.currentTime+1.08, master, { cluster:3, voices:2, pitch:1.55 });
+          }
+        }
+        onTimer(()=>releaseEggEl(e), 1500);
+      }, ms);
+    }
+
+    // Variante immediata (scheduler RAF)
     function spawnEggImmediate(lanePct, hatchMode, from='beat'){
       const c=ac();
       const e=getEggEl();
@@ -553,7 +584,7 @@
       n.start(t); n.stop(t+len);
     }
 
-    // Urlo principale 3s
+    // Urlo principale 3s (trackSource su 2 osc + noise)
     function chickenScream3s(c, t, out){
       setScream(true);
       const len=3.0;
@@ -571,8 +602,8 @@
         o.frequency.linearRampToValueAtTime(720, t+0.12);
         o.frequency.exponentialRampToValueAtTime(150, t+len*0.92);
         g.gain.setValueAtTime(0.0001,t);
-        g.gain.exponentialRampToValueAtTime(0.95, t+0.06);
-        g.gain.exponentialRampToValueAtTime(0.0001,t+len);
+        g.gain.exponentialRampToValueAtTime(0.95,t+0.06);
+        g.gain.exponentialRampToValueAtTime(0.0001, t+len);
         const trem=c.createOscillator(); trem.frequency.value=13;
         const tremAmt=c.createGain(); tremAmt.gain.value=0.7;
         trem.connect(tremAmt.gain); g.connect(tremAmt);
@@ -693,50 +724,60 @@
       }catch(e){}
     }
 
-    // === SCHEDULER UNICO (PATCH CRITICA) ===
-    const Q = { beat: [], burst: [] };
-    let SCHED_RAF = null;
-    const LOOKAHEAD = IS_MOBILE ? 0.18 : 0.11;              // più ampio su mobile
-    const BUDGET = { beat: IS_MOBILE ? 36 : 80, burst: IS_MOBILE ? 18 : 48 }; // priorità al beat
-    const MAX_QUEUE = 1200;
+    // === Code per queues & scheduler RAF ===
+    const BURST_Q = [];
+    const BEAT_Q  = [];
+    let burstRaf = null, beatRaf = null;
+    const LOOKAHEAD = 0.090;
 
-    function scheduleEggVisual(at, lane, hatchMode){
-      Q.beat.push({ at, lane, hatchMode });
-      runScheduler();
-    }
-    function enqueueBurst(at, lane, hatchMode){
-      if (Q.burst.length >= MAX_QUEUE) Q.burst.splice(0, Q.burst.length - MAX_QUEUE + 1);
-      Q.burst.push({ at, lane, hatchMode });
-      runScheduler();
-    }
+    // budget dinamici: boost al beat quando attivo
+    const MAX_PER_FRAME_BEAT  = IS_MOBILE ? 20 : 40;
+    const MAX_PER_FRAME_BURST = IS_MOBILE ? 12 : 40;
 
-    function runScheduler(){
-      if (SCHED_RAF) return;
+    function runBeatLoop(){
+      if (beatRaf) return;
       const c = ac();
       const step = () => {
-        SCHED_RAF = null;
+        beatRaf = null;
         const now = c.currentTime;
         const horizon = now + LOOKAHEAD;
 
-        // 1) BEAT prima (garantito)
-        let processedBeat = 0;
-        for (let i=0; i<Q.beat.length && processedBeat < BUDGET.beat; ){
-          const ev = Q.beat[i];
+        const boost = now < PRIORITY_BOOST_UNTIL;
+        const budget = boost ? Math.ceil(MAX_PER_FRAME_BEAT * 1.6) : MAX_PER_FRAME_BEAT;
+
+        let processed = 0;
+        for (let i=0; i<BEAT_Q.length && processed < budget; ){
+          const ev = BEAT_Q[i];
           if (ev.at <= horizon){
             spawnEggImmediate(ev.lane, ev.hatchMode, 'beat');
-            Q.beat.splice(i,1);
-            processedBeat++;
-          } else { i++; }
+            BEAT_Q.splice(i,1);
+            processed++;
+          } else {
+            i++;
+          }
         }
+        if (BEAT_Q.length) beatRaf = requestAnimationFrame(step);
+      };
+      beatRaf = requestAnimationFrame(step);
+    }
 
-        // 2) BURST dopo (con backpressure audio)
-        let processedBurst = 0;
-        for (let i=0; i<Q.burst.length && processedBurst < BUDGET.burst; ){
-          const ev = Q.burst[i];
-          if (ev.at <= horizon){
+    function runBurstLoop(){
+      if (burstRaf) return;
+      const c = ac();
+      const step = () => {
+        burstRaf = null;
+        const now = c.currentTime;
+        const horizon = now + LOOKAHEAD;
+
+        const boost = now < PRIORITY_BOOST_UNTIL;
+        const budget = boost ? Math.floor(MAX_PER_FRAME_BURST * 0.6) : MAX_PER_FRAME_BURST;
+
+        let processed = 0;
+        for (let i = 0; i < BURST_Q.length && processed < budget; ) {
+          const ev = BURST_Q[i];
+          if (ev.at <= horizon) {
             spawnEggImmediate(ev.lane, ev.hatchMode, 'burst');
-            // Layer audio solo se sotto budget
-            if (VOICES_NOW <= VOICE_BUDGET){
+            if (VOICES_NOW <= VOICE_BUDGET) {
               const crowd = Math.min(1, VOICES_NOW / (VOICE_BUDGET*0.9));
               const damp = 1 / Math.sqrt(1 + crowd*6);
               babyTherapyAA(c, now + 0.012, master, {
@@ -746,16 +787,28 @@
                 gain: 0.62 * (IS_MOBILE?1.10:1.0) * damp
               });
             }
-            Q.burst.splice(i,1);
-            processedBurst++;
-          } else { i++; }
+            BURST_Q.splice(i, 1);
+            processed++;
+          } else {
+            i++;
+          }
         }
 
-        if (Q.beat.length || Q.burst.length){
-          SCHED_RAF = requestAnimationFrame(step);
+        // watchdog anti-intasamento
+        if (BURST_Q.length > 800) {
+          BURST_Q.splice(0, BURST_Q.length - 800);
+        }
+
+        if (BURST_Q.length) {
+          burstRaf = requestAnimationFrame(step);
         }
       };
-      SCHED_RAF = requestAnimationFrame(step);
+      burstRaf = requestAnimationFrame(step);
+    }
+
+    function scheduleEggVisual(at, lane, hatchMode){
+      BEAT_Q.push({ at, lane, hatchMode });
+      runBeatLoop();
     }
 
     // START
@@ -764,10 +817,11 @@
       try { await c.resume(); } catch(e) {}
       ensureAudioUnlocked();
       ensureMasterUp();
+      STOPPED = false;
 
       if (cleanup) { try{ cleanup(); }catch(e){} }
       clearAllTimers();
-      if (loopTimer) { clearInterval(loopTimer); loopTimer=null; }
+      if (loopTimer) { clearTimeout(loopTimer); loopTimer=null; }
       MEASURE=0;
 
       initEggPool();
@@ -786,28 +840,31 @@
       // start caldo e immediato
       hatClick(c, c.currentTime + 0.003, master, IS_MOBILE ? 0.36 : 0.30);
 
-      const base = c.currentTime + 0.008;
+      const base = c.currentTime + 0.008; // più pronto
       transientPunch(1.08);
 
-      const afterS=chickenScream3s(c, base, master);
-      scheduleMeasure(c, afterS+0.06, master);
-
-      loopTimer=setInterval(()=>{
-        const nextBase = ac().currentTime;
+      // ==== PATCH: ciclo legato al clock audio (niente drift) ====
+      function runCycle(at){
+        const cc = ac();
         restartProgress();
-        const endS=chickenScream3s(ac(), nextBase, master);
-        scheduleMeasure(ac(), endS+0.06, master);
-      }, 5000);
+        const endS = chickenScream3s(cc, at, master);
+        const nextAt = endS + 0.06;  // misura dopo lo scream
+        scheduleMeasure(cc, nextAt, master);
+
+        const delay = Math.max(0, (nextAt - cc.currentTime) * 1000);
+        loopTimer = setTimeout(()=> runCycle(nextAt), delay);
+      }
+      runCycle(base);
 
       cleanup=()=>{
-        try{ clearInterval(loopTimer); }catch(e){}
+        try{ clearTimeout(loopTimer); }catch(e){}
         loopTimer=null;
         clearAllTimers();
 
-        // stop scheduler unico + code
-        if (SCHED_RAF){ cancelAnimationFrame(SCHED_RAF); SCHED_RAF = null; }
-        Q.beat.length = 0;
-        Q.burst.length = 0;
+        if (burstRaf){ cancelAnimationFrame(burstRaf); burstRaf = null; }
+        if (beatRaf){ cancelAnimationFrame(beatRaf); beatRaf = null; }
+        BURST_Q.length = 0;
+        BEAT_Q.length = 0;
 
         hatchTimers.forEach(id => clearTimeout(id));
         hatchTimers.clear();
@@ -823,6 +880,7 @@
         VOICES_NOW = 0;
         MEASURE = 0;
         stage.classList.remove('playing'); setScream(false);
+        STOPPED = true;
       };
 
       startBtn.style.display='none'; stopBtn.style.display='inline-block';
@@ -833,24 +891,36 @@
       startBtn.style.display='inline-block'; stopBtn.style.display='none';
     }
 
-    // EGGSplosion → enqueue nel nuovo scheduler unico
     function triggerEggsplosionBurst(){
       const c=ensureMaster();
       ensureAudioUnlocked();
       try{ c.resume?.(); }catch(e){}
-      ensureMasterUp();
+      ensureMasterUp(); // garantisce volume attivo anche a loop fermo
+
+      // >>> Burst sempre udibile anche dopo STOP
+      if (STOPPED) {
+        const now = c.currentTime + 0.001;
+        try {
+          master.gain.cancelScheduledValues(now);
+          master.gain.setValueAtTime(IS_MOBILE ? 1.25 : 1.12, now);
+        } catch(e){}
+        STOPPED = false;
+      }
+
       transientPunch(1.12);
+
+      // >>> Boost di priorità al beat per ~700ms
+      PRIORITY_BOOST_UNTIL = c.currentTime + 0.7;
 
       initEggPool();
       initAAPool();
-
       const t0=c.currentTime+0.02;
 
       const WAVES = 3;
       const EGGS_PER_WAVE_BASE = IS_MOBILE ? 16 : 24;
       const STEP_BASE = IS_MOBILE ? 0.022 : 0.017;
 
-      const load = Q.burst.length / MAX_QUEUE;
+      const load = BURST_Q.length / 1200;
       const scale = load > 0.5 ? (1 - (load-0.5)*0.8) : 1;
       const EGGS_PER_WAVE = Math.max(8, Math.round(EGGS_PER_WAVE_BASE * scale));
       const STEP = STEP_BASE / Math.max(1, scale);
@@ -862,9 +932,11 @@
           const at=base + i*STEP;
           const lane=LANES[Math.floor(Math.random()*LANES.length)];
           const mode=(Math.random()<0.7?'air':'ground');
-          enqueueBurst(at, lane, mode);
+          if (BURST_Q.length >= 1200) BURST_Q.splice(0, BURST_Q.length - 1200 + 1);
+          BURST_Q.push({ at, lane, hatchMode: mode });
         }
       }
+      runBurstLoop();
     }
 
     // eventi
@@ -894,6 +966,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 
