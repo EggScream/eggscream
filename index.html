@@ -265,7 +265,13 @@
     const SWING = (window.innerWidth < 700 ? 0.03 : 0.04);
     const LANES = [12, 31, 50, 69, 88];
 
-    function ac(){ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); return ctx; }
+    // >>> PATCH: rileva mobile per regolare volume/polifonia
+    const IS_MOBILE = (('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0) ||
+                      (window.matchMedia && window.matchMedia('(pointer:coarse)').matches));
+    const VOICE_BUDGET = IS_MOBILE ? 18 : 48; // numero massimo di "voci" synth vive
+    let VOICES_NOW = 0;
+
+    function ac(){ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive', sampleRate:44100}); return ctx; }
     function onTimer(fn, ms){ const id=setTimeout(()=>{ fn(); }, ms); timeouts.push(id); return id; }
     function clearAllTimers(){ timeouts.forEach(id=>clearTimeout(id)); timeouts=[]; }
 
@@ -309,6 +315,8 @@
       g.gain.setValueAtTime(1.05,t);
       g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);
       o.connect(g).connect(out); o.start(t); o.stop(t+0.19);
+      // budget
+      VOICES_NOW+=1; onTimer(()=>{ VOICES_NOW-=1; }, (t - c.currentTime + 0.2)*1000);
     }
     function snareCluck(c, t, out){
       const o=c.createOscillator(); o.type='square';
@@ -318,6 +326,7 @@
       g.gain.setValueAtTime(0.95,t);
       g.gain.exponentialRampToValueAtTime(0.0001,t+0.1);
       o.connect(g).connect(out); o.start(t); o.stop(t+0.11);
+      VOICES_NOW+=1; onTimer(()=>{ VOICES_NOW-=1; }, (t - c.currentTime + 0.12)*1000);
     }
     function hatClick(c, t, out, gain=0.42){
       const buf=c.createBuffer(1, Math.floor(c.sampleRate*0.05), c.sampleRate);
@@ -327,13 +336,17 @@
       const g=c.createGain(); g.gain.setValueAtTime(gain, t);
       g.gain.exponentialRampToValueAtTime(0.0001, t+0.05);
       n.connect(hp).connect(g).connect(out); n.start(t); n.stop(t+0.06);
+      VOICES_NOW+=1; onTimer(()=>{ VOICES_NOW-=1; }, (t - c.currentTime + 0.07)*1000);
     }
 
     // ---- Mini “aa”
     function babyTherapyAA(c, t, out, {
       len=0.34, pitch=1.6, gain=0.58, detCents=8, tremHz=14, distAmt=18, voices=2, cluster=2, clusterGap=0.035
     } = {}){
+      // >>> PATCH: soft scaling su mobile + budget voci
+      if (IS_MOBILE){ gain *= 0.75; voices = Math.max(1, Math.min(voices, 2)); cluster = Math.min(cluster, 2); }
       for (let k=0;k<cluster;k++){
+        if (VOICES_NOW > VOICE_BUDGET) break;
         const tt=t+k*clusterGap;
         const bus=c.createGain(); bus.gain.setValueAtTime(0.0001,tt);
         bus.gain.exponentialRampToValueAtTime(gain,tt+0.02);
@@ -345,6 +358,8 @@
         const sum=c.createGain(); sum.connect(dist).connect(bp).connect(lp).connect(bus).connect(out);
 
         for(let v=0; v<voices; v++){
+          if (VOICES_NOW > VOICE_BUDGET) break;
+          VOICES_NOW+=1;
           const det=(v===0?-detCents:+detCents);
           const o=c.createOscillator(); o.type='sawtooth';
           const g=c.createGain();
@@ -363,16 +378,23 @@
           o.connect(g).connect(sum);
           trem.start(tt); trem.stop(tt+len);
           o.start(tt);    o.stop(tt+len);
+
+          onTimer(()=>{ VOICES_NOW-=1; }, (tt - c.currentTime + len + 0.02)*1000);
         }
-        const nb=c.createBuffer(1, Math.floor(c.sampleRate*len), c.sampleRate);
-        const nd=nb.getChannelData(0); for(let i=0;i<nd.length;i++) nd[i]=Math.random()*2-1;
-        const n=c.createBufferSource(); n.buffer=nb;
-        const nBP=c.createBiquadFilter(); nBP.type='bandpass'; nBP.frequency.value=2400; nBP.Q.value=6;
-        const ng=c.createGain(); ng.gain.setValueAtTime(0.001, tt+0.03);
-        ng.gain.exponentialRampToValueAtTime(0.22, tt+0.08);
-        ng.gain.exponentialRampToValueAtTime(0.0001, tt+len);
-        n.connect(nBP).connect(ng).connect(sum);
-        n.start(tt); n.stop(tt+len);
+        // noise layer
+        if (VOICES_NOW <= VOICE_BUDGET){
+          VOICES_NOW+=1;
+          const nb=c.createBuffer(1, Math.floor(c.sampleRate*len), c.sampleRate);
+          const nd=nb.getChannelData(0); for(let i=0;i<nd.length;i++) nd[i]=Math.random()*2-1;
+          const n=c.createBufferSource(); n.buffer=nb;
+          const nBP=c.createBiquadFilter(); nBP.type='bandpass'; nBP.frequency.value=2400; nBP.Q.value=6;
+          const ng=c.createGain(); ng.gain.setValueAtTime(0.001, tt+0.03);
+          ng.gain.exponentialRampToValueAtTime(0.22, tt+0.08);
+          ng.gain.exponentialRampToValueAtTime(0.0001, tt+len);
+          n.connect(nBP).connect(ng).connect(sum);
+          n.start(tt); n.stop(tt+len);
+          onTimer(()=>{ VOICES_NOW-=1; }, (tt - c.currentTime + len + 0.02)*1000);
+        }
       }
     }
 
@@ -528,15 +550,16 @@
       const now=c.currentTime+0.001;
       try{
         master.gain.cancelScheduledValues(now);
-        master.gain.setValueAtTime(1.10, now);
+        master.gain.setValueAtTime(IS_MOBILE ? 0.9 : 1.10, now);
       }catch(e){}
+      // >>> PATCH: sblocco audio in stesso tick (no await)
+      c.resume && c.resume();
       return c;
     }
 
-    async function startLoop(){
+    function startLoop(){
       const c=ensureMaster();
-      try{ await c.resume(); }catch(e){}
-      if (c.state!=='running') return;
+      if (c.state!=='running'){ /* iOS: ci pensa resume() in ensureMaster */ }
 
       if (cleanup) { try{ cleanup(); }catch(e){} }
       clearAllTimers();
@@ -579,32 +602,49 @@
     }
 
     // EGGSplosion (anche a loop fermo)
-    async function triggerEggsplosionBurst(){
+    function triggerEggsplosionBurst(){
       const c=ensureMaster();
-      try{ await c.resume(); }catch(e){}
       const now=c.currentTime+0.03;
-      for(let wave=0; wave<3; wave++){
+
+      // >>> PATCH: densità adattiva (desktop full, mobile alleggerito)
+      const WAVES = IS_MOBILE ? 2 : 3;
+      const EGGS_PER_WAVE = IS_MOBILE ? 12 : 18;
+      const STEP = IS_MOBILE ? 0.026 : 0.02;
+
+      for(let wave=0; wave<WAVES; wave++){
         const base=now + wave*0.38;
-        for(let i=0;i<18;i++){
-          const t=base + i*0.02;
+        for(let i=0;i<EGGS_PER_WAVE;i++){
+          const t=base + i*STEP;
           const lane=LANES[Math.floor(Math.random()*LANES.length)];
           const mode=(Math.random()<0.7?'air':'ground');
           dropEggAt(lane, t, mode);
-          if (Math.random()<0.92) babyTherapyAA(c, t+0.015, master, { cluster:2, voices:2, pitch:1.6 + Math.random()*0.15 });
+          if (VOICES_NOW <= VOICE_BUDGET && Math.random()<0.92){
+            babyTherapyAA(c, t+0.015, master, { cluster:2, voices:2, pitch:1.6 + Math.random()*0.15 });
+          }
         }
       }
     }
 
-    // UI
+    // UI (>>> PATCH: niente await; sblocco audio nello stesso tick)
     if (startBtn){
       startBtn.addEventListener('click', startLoop, {passive:true});
       stopBtn .addEventListener('click', stopLoop,  {passive:true});
       eggBtn  .addEventListener('click', triggerEggsplosionBurst, {passive:true});
     }
+
+    // (Opzionale) piccolo tip su mobile se silenzioso
+    document.addEventListener('touchend', (e) => {
+      if (!IS_MOBILE) return;
+      // crea contesto e prova resume in gesto
+      ensureMaster();
+    }, { once:true });
+
   })();
   </script>
 </body>
 </html>
+
+
 
 
 
