@@ -238,7 +238,7 @@
     // >>> PATCH: device flags  
     const IS_MOBILE = (('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0) ||
                        (window.matchMedia && window.matchMedia('(pointer:coarse)').matches));
-    const VOICE_BUDGET = IS_MOBILE ? 28 : 120;
+    const VOICE_BUDGET = IS_MOBILE ? 34 : 140; // PATCH D
     let VOICES_NOW = 0;
 
     // mostra i controlli solo se c'è ?success=1 nell'URL  
@@ -254,7 +254,7 @@
     let ctx = null, loopTimer = null, cleanup = null, MEASURE = 0;  
     let master = null, preSat=null, hardLim = null, comp = null;  
 
-    // --- TIMER AUTO-CLEANUP (patch 1)
+    // --- TIMER AUTO-CLEANUP
     let activeTimers = new Set();
     function onTimer(fn, ms){
       const id = setTimeout(()=>{ activeTimers.delete(id); fn(); }, ms);
@@ -520,7 +520,7 @@
       }, ms);  
     }  
 
-    // ---- Variante immediata per lo spawn (usata dai scheduler RAF)
+    // ---- Variante immediata (usata dallo scheduler di burst)
     function spawnEggImmediate(lanePct, hatchMode, from='beat'){
       const c=ac();
       const e=getEggEl();
@@ -545,7 +545,7 @@
       onTimer(()=>releaseEggEl(e), 1500);  
     }
 
-    // ---- Botta corta sub per EGGSplosion
+    // ---- Botta corta sub per EGGSplosion (PATCH D più impatto)
     function boomPunch(c, t, out) {
       const len = 0.16;
       const nb = c.createBuffer(1, Math.ceil(c.sampleRate*len), c.sampleRate);
@@ -555,7 +555,7 @@
       const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = IS_MOBILE ? 260 : 220;
       const g  = c.createGain();
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(IS_MOBILE ? 1.05 : 1.10, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(IS_MOBILE ? 1.10 : 1.14, t + 0.006);
       g.gain.exponentialRampToValueAtTime(0.0001, t + len);
       n.connect(lp).connect(g).connect(out);
       n.start(t); n.stop(t+len);
@@ -599,19 +599,18 @@
       n.connect(nBP).connect(ng).connect(bus);  
       n.start(t); n.stop(t+len);  
 
-      // tick + uova leggere durante lo scream  
+      // tick + uova leggere durante lo scream  (PATCH A: usa dropEggAt)
       for (let x=t+0.10; x < t+len-0.06; x += 0.25){  
         hatClick(c, x, out, 0.18);  
         const lane = (Math.round((x - t)/0.25) % 2) ? 31 : 50;  
-        // passa allo scheduler visuale del beat
-        scheduleEggVisual(x, lane, null);
+        dropEggAt(lane, x, null);
       }  
 
       onTimer(()=>setScream(false), (len*1000)+60);  
       return t+len;  
     }  
 
-    // ---- Misura 2s con swing + fill  (PATCH 2: usa scheduleEggVisual)
+    // ---- Misura 2s con swing + fill  (PATCH A: usa dropEggAt)
     function scheduleMeasure(c, start, out){  
       const isFill = ((++MEASURE % 4) === 0);  
       const dur=2.0, beat=0.5;  
@@ -630,11 +629,11 @@
         else               { snareCluck(c,t,out); }  
 
         hatClick(c,t,out, isFill?0.30:0.42);  
-        scheduleEggVisual(t, [12,69,31,88][i], Math.random()<0.18 ? (Math.random()<0.5?'air':'ground') : null);
+        dropEggAt([12,69,31,88][i], t, Math.random()<0.18 ? (Math.random()<0.5?'air':'ground') : null);
 
         const off = t + beat/2 + (SWING*beat);  
         hatClick(c, off, out, isFill?0.30:0.42);  
-        scheduleEggVisual(off, [50,31,50,69][i], Math.random()<0.28 ? (Math.random()<0.5?'air':'ground') : null);
+        dropEggAt([50,31,50,69][i], off, Math.random()<0.28 ? (Math.random()<0.5?'air':'ground') : null);
 
         if (Math.random() < (0.85)){  
           babyTherapyAA(c, off, out, { cluster: isFill?3:2, voices:2 });  
@@ -648,7 +647,7 @@
           const s16=beat/4;  
           [t+s16, t+2*s16, t+3*s16].forEach(tt=>{  
             hatClick(c, tt, out, 0.26);  
-            scheduleEggVisual(tt, 50, Math.random()<0.5 ? (Math.random()<0.5?'air':'ground') : null);  
+            dropEggAt(50, tt, Math.random()<0.5 ? (Math.random()<0.5?'air':'ground') : null);
           });  
           if (Math.random()<0.5) babyTherapyAA(c, off, out, { cluster:3, voices:2 });  
         }  
@@ -739,7 +738,6 @@
         loopTimer=null;  
         clearAllTimers();  
 
-        // stop scheduler burst & beat
         if (burstRaf){ cancelAnimationFrame(burstRaf); burstRaf = null; }
         if (beatRaf){ cancelAnimationFrame(beatRaf); beatRaf = null; }
         BURST_Q.length = 0;
@@ -769,11 +767,11 @@
       startBtn.style.display='inline-block'; stopBtn.style.display='none';  
     }  
 
-    // === QUEUE-BASED EGGSplosion (già presente) ===
+    // === QUEUE-BASED EGGSplosion ===
     const BURST_Q = [];
     let burstRaf = null;
     const LOOKAHEAD = 0.090;
-    const MAX_PER_FRAME = IS_MOBILE ? 20 : 40;
+    const MAX_PER_FRAME = IS_MOBILE ? 18 : 40; // PATCH D leggero
     let lastEggsploTap = 0;
     const MAX_QUEUE = 1200;
 
@@ -789,9 +787,7 @@
         for (let i = 0; i < BURST_Q.length && processed < MAX_PER_FRAME; ) {
           const ev = BURST_Q[i];
           if (ev.at <= horizon) {
-            // SPAWN immediato (burst)
             spawnEggImmediate(ev.lane, ev.hatchMode, 'burst');
-            // AUDIO con damping dinamico
             if (VOICES_NOW <= VOICE_BUDGET) {
               const crowd = Math.min(1, VOICES_NOW / (VOICE_BUDGET*0.9));
               const damp = 1 / Math.sqrt(1 + crowd*6);
@@ -819,6 +815,14 @@
       const c=ensureMaster();  
       ensureAudioUnlocked();
       if (c.state !== 'running' && c.resume) { try{ c.resume(); }catch(e){} }
+
+      // PATCH B: ripristina il master e una mini botta anche a loop fermo
+      try{
+        const now = c.currentTime + 0.001;
+        master.gain.cancelScheduledValues(now);
+        master.gain.setValueAtTime(IS_MOBILE ? 1.25 : 1.12, now);
+      }catch(e){}
+      transientPunch(1.12);
 
       const nowMs = performance.now();
       const merge = (nowMs - lastEggsploTap) < 120;
@@ -851,7 +855,7 @@
       runBurstLoop();
     }
 
-    // === Scheduler uova del BEAT (PATCH 2) ===
+    // (Le funzioni BEAT_Q rimangono inutilizzate dopo PATCH A, le lascio intatte per compatibilità)
     const BEAT_Q = [];
     let beatRaf = null;
     function scheduleEggVisual(at, lane, hatchMode){
@@ -881,20 +885,20 @@
       beatRaf = requestAnimationFrame(step);
     }
 
-    // >>> eventi
+    // >>> eventi (PATCH C: niente once, sblocco ad ogni tap)
     if (startBtn){  
       startBtn.addEventListener('pointerdown', startLoop, {passive:true});  
       stopBtn .addEventListener('pointerdown', stopLoop,  {passive:true});  
       eggBtn  .addEventListener('pointerdown', triggerEggsplosionBurst, {passive:true});  
 
-      ['click','touchend'].forEach(evt=>{
-        startBtn.addEventListener(evt, ()=>{ ensureMaster(); ensureAudioUnlocked(); ac().resume?.(); }, {passive:true, once:true});
-        eggBtn  .addEventListener(evt, ()=>{ ensureMaster(); ensureAudioUnlocked(); ac().resume?.(); }, {passive:true, once:true});
+      ['pointerdown','click','touchend'].forEach(evt=>{
+        startBtn.addEventListener(evt, ()=>{ ensureMaster(); ensureAudioUnlocked(); ac().resume?.(); }, {passive:true});
+        eggBtn  .addEventListener(evt, ()=>{ ensureMaster(); ensureAudioUnlocked(); ac().resume?.(); }, {passive:true});
       });
     }  
 
-    ['touchstart','click'].forEach(evt=>{
-      document.addEventListener(evt, ()=>{ ensureAudioUnlocked(); ac().resume?.(); }, {passive:true, once:true});
+    ['pointerdown','touchstart','click'].forEach(evt=>{
+      document.addEventListener(evt, ()=>{ ensureAudioUnlocked(); ac().resume?.(); }, {passive:true});
     });
 
     document.addEventListener('visibilitychange', () => {
@@ -907,6 +911,8 @@
   })();  
   </script>  </body>  
 </html>
+
+
 
 
 
