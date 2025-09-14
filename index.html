@@ -17,7 +17,7 @@
     html,body{margin:0;background:var(--offwhite);color:var(--ink)}
     body{font:16px/1.4 "Comic Neue", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif}
 
-    /* --- Hero con strisce --- */
+    /* --- Hero full bleed con strisce oblique --- */
     .hero{
       min-height:100dvh; display:flex; align-items:center; justify-content:center; padding:48px 18px;
       background:
@@ -30,6 +30,7 @@
       box-shadow:0 28px 60px rgba(0,0,0,.25);
     }
 
+    /* Badge/tag sopra il bottone */
     .tag{
       display:inline-block; background:#fff; border:4px solid #111; border-radius:999px;
       padding:.35rem .8rem; font-family:"Bangers", system-ui; letter-spacing:.02em; font-size:clamp(14px,2.6vw,18px);
@@ -41,7 +42,7 @@
     }
     .sub{ margin:.25rem 0 0; font-weight:700; font-size:clamp(16px,3.2vw,22px); }
 
-    /* --- STAGE --- */
+    /* Gallina gigante / STAGE */
     .stage{
       position:relative; margin:24px auto 0; height:320px; border:3px dashed var(--line); border-radius:22px;
       display:flex; align-items:center; justify-content:center; background:linear-gradient(#fff,#fafafa); overflow:hidden;
@@ -51,44 +52,52 @@
     .spark.s1{ left:14%; top:22% } .spark.s2{ right:12%; top:18% } .spark.s3{ left:10%; bottom:14% } .spark.s4{ right:8%; bottom:12% }
     @keyframes pop{ 0%,100%{ transform:scale(1) rotate(0) } 50%{ transform:scale(1.2) rotate(10deg) } }
 
-    /* Gallina – stessa grafica, centrata e con origin coerente */
+    /* >>> PATCH: centratura reale + origin coerente <<< */
     .chicken{
       width:min(360px,76vw);
       transform:rotate(-4deg);
       transform-origin:center center;
       position:relative;
-      margin:0 auto;
+      margin:0 auto; /* centra nello stage */
     }
 
+    /* ---- VITA DEL POLLO ---- */
     /* Occhio blink */
     .eye{ animation:eyeBlink 4.2s infinite; transform-origin:170px 105px }
     @keyframes eyeBlink{ 0%,96%,100%{ transform:scaleY(1) } 98%{ transform:scaleY(.1) } }
 
-    /* Cresta idle + sway durante urlo */
+    /* Cresta viva (idle + durante scream) */
     .crest{ transform-origin:170px 82px; animation:crestBlink .9s steps(2,end) infinite }
     @keyframes crestBlink{ 0%,100%{ fill:var(--red) } 50%{ fill:var(--blue) } }
     .scream .crest{ animation:crestSway .18s ease-in-out infinite }
     @keyframes crestSway{ 0%{transform:rotate(0)} 50%{transform:rotate(-7deg)} 100%{transform:rotate(0)} }
 
-    /* Becco che si apre in scream */
+    /* Becco */
     .beak-upper,.beak-lower{ transform-origin:182px 120px; transition:transform .08s ease }
     .scream .beak-upper{ transform:rotate(-22deg) translateY(-2px) }
     .scream .beak-lower{ transform:rotate(22deg) translateY(6px) }
 
-    /* Ala che “pompa” a tempo */
+    /* Ala “pompa” a tempo */
     .wing{ transform-origin:125px 125px }
     .beat .wing{ animation:flap .24s ease-out }
     @keyframes flap{ 0%{transform:rotate(0)} 50%{transform:rotate(-8deg)} 100%{transform:rotate(0)} }
 
-    /* “Respiro” idle + micro pump sui colpi (senza translateX) */
+    /* >>> PATCH: respiro + pump senza translateX <<< */
     .chicken.breathe { animation: chickenBreathe 3s ease-in-out infinite }
-    @keyframes chickenBreathe { 0%,100%{ transform:rotate(-4deg) scale(1) } 50%{ transform:rotate(-4deg) scale(1.01) } }
+    @keyframes chickenBreathe {
+      0%,100%{ transform:rotate(-4deg) scale(1) }
+      50%    { transform:rotate(-4deg) scale(1.01) }
+    }
     .chicken.pump { animation: chickenPump .12s ease-out 1 }
-    @keyframes chickenPump { 0%{transform:rotate(-4deg)} 50%{transform:rotate(-4.6deg)} 100%{transform:rotate(-4deg)} }
+    @keyframes chickenPump {
+      0%   { transform: rotate(-4deg) }
+      50%  { transform: rotate(-4.6deg) }
+      100% { transform: rotate(-4deg) }
+    }
     .crest.bob { animation: crestBob .12s ease-out 1; transform-origin:170px 82px }
     @keyframes crestBob { 0%{transform:rotate(0)} 50%{transform:rotate(-7deg)} 100%{transform:rotate(0)} }
 
-    /* AAA */
+    /* AAA fisso vicino al becco */
     .shout{
       position:absolute; left:calc(50% + 150px); top:86px; transform:translateX(-50%) rotate(-3deg);
       font-family:"Bangers"; font-size:clamp(22px,4.5vw,36px); color:#FF0033; text-shadow:0 3px #fff, 3px 3px #111;
@@ -96,7 +105,7 @@
     }
     .scream .shout{ opacity:1; transform:translateX(-50%) }
 
-    /* Uova che cadono + mini “aa” */
+    /* Emoji uova che cadono + schiusa */
     .egg, .chickAA{
       position:absolute; will-change:transform,opacity; filter:drop-shadow(0 2px 2px rgba(0,0,0,.15));
       pointer-events:none; z-index:3;
@@ -107,10 +116,14 @@
       8%{ opacity:1 } 92%{ transform:translate(var(--x,0), 260px) rotate(340deg) }
       100%{ transform:translate(var(--x,0), 265px) rotate(360deg); opacity:.98 }
     }
+    @keyframes chickPop{ 0%{ transform:translateY(28px); opacity:0 } 35%{ transform:translateY(-4px); opacity:1 } 100%{ transform:translateY(16px); opacity:0 } }
+    @keyframes chickFall{ 0%{ transform:translateY(-40px) rotate(-25deg); opacity:0 } 15%{ opacity:1 } 100%{ transform:translateY(220px) rotate(25deg); opacity:.98 } }
+
+    /* mini “aa” vicino alla schiusa */
     .miniAA{ position:absolute; font-weight:900; font-size:14px; color:#e11; text-shadow:0 1px 0 #fff,1px 1px 0 rgba(0,0,0,.14); opacity:0; z-index:4 }
     @keyframes aaPop{ 0%{transform:translateY(0) scale(.8);opacity:0} 30%{opacity:1} 100%{transform:translateY(-8px) scale(1.06);opacity:0} }
 
-    /* CTA con pulse */
+    /* Pulsantone giallo + pulse rosso ogni ~2s */
     .cta{
       position:relative; display:inline-block; margin-top:22px; padding:1.05rem 1.35rem;
       background:var(--yellow); color:#111; text-decoration:none;
@@ -120,22 +133,25 @@
       font-family:"Bangers"; font-size:clamp(16px,3.6vw,26px); letter-spacing:.02em;
       transition:transform .08s ease, box-shadow .08s ease, filter .12s ease; overflow:visible;
     }
-    .cta::after{ content:""; position:absolute; inset:-6px; border-radius:inherit; pointer-events:none;
-      box-shadow:0 0 0 0 rgba(255,0,51,.34); animation:btnPulse 2.2s ease-out infinite; }
+    .cta::after{
+      content:""; position:absolute; inset:-6px; border-radius:inherit; pointer-events:none;
+      box-shadow:0 0 0 0 rgba(255,0,51,.34); animation:btnPulse 2.2s ease-out infinite;
+    }
     @keyframes btnPulse{ 0%{box-shadow:0 0 0 0 rgba(255,0,51,.34)} 70%{box-shadow:0 0 0 18px rgba(255,0,51,0)} 100%{box-shadow:0 0 0 0 rgba(255,0,51,0)} }
     .cta:hover{ filter:saturate(1.1) }
     .cta:active{ transform:translateY(2px); box-shadow:0 6px 0 #111 }
 
+    /* Disclaimer */
     .disclaimers{ margin:14px auto 0; max-width:680px; list-style:none; padding:0; color:#333; font-weight:700; font-size:clamp(12px,2.6vw,14px) }
     .disclaimers li{ margin:.25rem 0 }
 
-    /* Barra misura */
+    /* Barra di progresso sottile (sopra stage, opzionale) */
     .measure{position:absolute; left:0; right:0; top:0; height:6px; background:rgba(0,0,0,.06)}
     .bar{position:absolute; left:0; top:0; bottom:0; width:0; background:linear-gradient(90deg,#ff8a8a 0 60%, #88c7ff 60% 100%); border-bottom-right-radius:6px}
     .playing .bar{ animation:measure 5s linear infinite }
     @keyframes measure{from{width:0} to{width:100%}}
 
-    /* Controlli post-pagamento */
+    /* Controlli post-pagamento (restano invisibili finché non success=1) */
     .controls{ display:none; gap:10px; justify-content:center; margin:16px 0 0 }
     .controls .btn{ border:3px solid #111; background:#fff; padding:.6rem .9rem; border-radius:12px; font-weight:900; cursor:pointer }
     .controls .btn:active{ transform:translateY(1px) }
@@ -148,8 +164,14 @@
       width:min(520px,92vw); background:#fff; border:4px solid #111; border-radius:22px; padding:22px;
       box-shadow:0 20px 60px rgba(0,0,0,.45); text-align:center;
     }
-    .paybtn{ display:block; margin:12px 0 0; padding:12px 14px; border-radius:12px; color:#fff; text-decoration:none; font-weight:900; background:#635bff; }
-    .close{ display:inline-block; margin-top:12px; padding:.6rem .9rem; border:3px solid #111; border-radius:12px; background:#f3f3f3; text-decoration:none; color:#111; font-weight:900; }
+    .paybtn{
+      display:block; margin:12px 0 0; padding:12px 14px; border-radius:12px; color:#fff; text-decoration:none;
+      font-weight:900; background:#635bff;
+    }
+    .close{
+      display:inline-block; margin-top:12px; padding:.6rem .9rem; border:3px solid #111; border-radius:12px;
+      background:#f3f3f3; text-decoration:none; color:#111; font-weight:900;
+    }
   </style>
 </head>
 <body>
@@ -162,7 +184,7 @@
       <div class="stage" id="stage" aria-hidden="true">
         <div class="measure"><div class="bar"></div></div>
 
-        <!-- decor -->
+        <!-- decor “fairground” -->
         <div class="spark s1">⭐</div><div class="spark s2">⭐</div>
         <div class="spark s3">⭐</div><div class="spark s4">⭐</div>
 
@@ -195,7 +217,7 @@
         <li>As American as fried chicken at 3 AM.</li>
       </ul>
 
-      <!-- Controlli post-pagamento -->
+      <!-- Controlli che compaiono post-pagamento -->
       <div class="controls" id="controls">
         <button id="startBtn" class="btn">🔊 Start Beat</button>
         <button id="stopBtn"  class="btn" style="display:none">🛑 Stop</button>
@@ -215,6 +237,7 @@
   </div>
 
   <script>
+  // ===== AUDIO + VISUAL ENGINE (urlo principale invariato) =====
   (function(){
     const stage = document.getElementById('stage');
     const bar   = stage.querySelector('.bar');
@@ -225,23 +248,26 @@
     const chicken  = stage.querySelector('.chicken');
     const crestEl  = stage.querySelector('.crest');
 
-    // mostra i controlli solo se ?success=1
+    // mostra i controlli solo se c'è ?success=1 nell'URL
     const url = new URL(location.href);
-    if (url.searchParams.get('success') === '1') controls.style.display = 'flex';
+    if (url.searchParams.get('success') === '1') {
+      controls.style.display = 'flex';
+    }
 
+    // respiro idle
     chicken.classList.add('breathe');
 
-    /* ===== Stato audio ===== */
-    let ctx=null, loopTimer=null, cleanup=null, MEASURE=0;
-    let master=null, softLim=null, comp=null;
-    let timeouts=[];
+    // ===== Stato audio / scheduling =====
+    let ctx = null, loopTimer = null, cleanup = null, MEASURE = 0;
+    let master = null, softLim = null, comp = null;
+    let timeouts = []; // per fermare TUTTO subito
 
     const SWING = (window.innerWidth < 700 ? 0.03 : 0.04);
     const LANES = [12, 31, 50, 69, 88];
 
     function ac(){ if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)(); return ctx; }
-    function onTimer(fn, ms){ const id=setTimeout(fn, ms); timeouts.push(id); return id; }
-    function clearAllTimers(){ timeouts.forEach(clearTimeout); timeouts.length=0; }
+    function onTimer(fn, ms){ const id=setTimeout(()=>{ fn(); }, ms); timeouts.push(id); return id; }
+    function clearAllTimers(){ timeouts.forEach(id=>clearTimeout(id)); timeouts=[]; }
 
     function mkDist(c, amt=24){
       const ws=c.createWaveShaper(), n=512, curve=new Float32Array(n);
@@ -249,33 +275,21 @@
       ws.curve=curve; ws.oversample='4x'; return ws;
     }
 
-    /* ===== Audio Unlock (mobile + desktop) ===== */
-    let audioUnlocked=false;
-    async function unlockAudio(){
-      const c=ac();
-      try{ await c.resume(); }catch(e){}
-      try{ // micro “tick” muto per sbloccare iOS
-        const o=c.createOscillator(), g=c.createGain();
-        g.gain.value=0; o.connect(g).connect(c.destination);
-        o.start(c.currentTime); o.stop(c.currentTime+0.01);
-      }catch(e){}
-      audioUnlocked=true;
-    }
-    window.addEventListener('pointerdown', ()=>{ if(!audioUnlocked) unlockAudio(); }, {once:true, passive:true});
-    window.addEventListener('keydown', ()=>{ if(!audioUnlocked) unlockAudio(); }, {once:true});
-
-    /* ===== Visual ===== */
+    // ---- Visual
     function setScream(on){
       stage.classList.toggle('scream', !!on);
       const shoutEl = stage.querySelector('.shout');
-      if (shoutEl) shoutEl.style.opacity = on ? '1' : '0';
+      if (!shoutEl) return;
+      if (on){ shoutEl.style.opacity='1'; shoutEl.style.transform='translateX(-50%)'; }
+      else   { shoutEl.style.opacity='0'; }
     }
     function pulseWing(){ stage.classList.add('beat'); onTimer(()=>stage.classList.remove('beat'), 150); }
     function pumpChickenAt(when){
-      const c = ac(); const ms = Math.max(0, (when - c.currentTime) * 1000);
+      const c = ac();
+      const ms = Math.max(0, (when - c.currentTime) * 1000);
       onTimer(()=>{
         chicken.classList.remove('pump'); void chicken.offsetWidth; chicken.classList.add('pump');
-        crestEl.classList.remove('bob');   void crestEl.offsetWidth; crestEl.classList.add('bob');
+        if (crestEl){ crestEl.classList.remove('bob'); void crestEl.offsetWidth; crestEl.classList.add('bob'); }
       }, ms);
     }
     function thumpAt(c, when){
@@ -286,74 +300,106 @@
       }, ms);
     }
 
-    /* ===== Suoni base ===== */
-    function kickPlop(c,t,out){ const o=c.createOscillator(); o.type='sine';
-      const g=c.createGain(); o.frequency.setValueAtTime(140,t);
+    // ---- Suoni base
+    function kickPlop(c, t, out){
+      const o=c.createOscillator(); o.type='sine';
+      const g=c.createGain();
+      o.frequency.setValueAtTime(140,t);
       o.frequency.exponentialRampToValueAtTime(55,t+0.16);
-      g.gain.setValueAtTime(1.05,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);
-      o.connect(g).connect(out); o.start(t); o.stop(t+0.19); }
-    function snareCluck(c,t,out){ const o=c.createOscillator(); o.type='square';
-      const g=c.createGain(); o.frequency.setValueAtTime(750,t);
+      g.gain.setValueAtTime(1.05,t);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);
+      o.connect(g).connect(out); o.start(t); o.stop(t+0.19);
+    }
+    function snareCluck(c, t, out){
+      const o=c.createOscillator(); o.type='square';
+      const g=c.createGain();
+      o.frequency.setValueAtTime(750,t);
       o.frequency.exponentialRampToValueAtTime(300,t+0.07);
-      g.gain.setValueAtTime(0.95,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.1);
-      o.connect(g).connect(out); o.start(t); o.stop(t+0.11); }
-    function hatClick(c,t,out,gain=0.42){
+      g.gain.setValueAtTime(0.95,t);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.1);
+      o.connect(g).connect(out); o.start(t); o.stop(t+0.11);
+    }
+    function hatClick(c, t, out, gain=0.42){
       const buf=c.createBuffer(1, Math.floor(c.sampleRate*0.05), c.sampleRate);
       const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*0.9;
       const n=c.createBufferSource(); n.buffer=buf;
       const hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=5000;
-      const g=c.createGain(); g.gain.setValueAtTime(gain,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.05);
+      const g=c.createGain(); g.gain.setValueAtTime(gain, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+0.05);
       n.connect(hp).connect(g).connect(out); n.start(t); n.stop(t+0.06);
     }
 
-    /* ===== Mini “aa” trash therapy ===== */
-    function babyTherapyAA(c, t, out, {len=0.34, pitch=1.6, gain=0.58, detCents=8, tremHz=14, distAmt=18, voices=2, cluster=2, clusterGap=0.035}={}){
+    // ---- Mini “aa”
+    function babyTherapyAA(c, t, out, {
+      len=0.34, pitch=1.6, gain=0.58, detCents=8, tremHz=14, distAmt=18, voices=2, cluster=2, clusterGap=0.035
+    } = {}){
       for (let k=0;k<cluster;k++){
         const tt=t+k*clusterGap;
         const bus=c.createGain(); bus.gain.setValueAtTime(0.0001,tt);
         bus.gain.exponentialRampToValueAtTime(gain,tt+0.02);
         bus.gain.exponentialRampToValueAtTime(0.0001,tt+len);
+
         const dist=mkDist(c,distAmt), bp=c.createBiquadFilter(), lp=c.createBiquadFilter();
-        bp.type='bandpass'; bp.frequency.value=2000; bp.Q.value=5; lp.type='lowpass'; lp.frequency.value=3200;
+        bp.type='bandpass'; bp.frequency.value=2000; bp.Q.value=5;
+        lp.type='lowpass';  lp.frequency.value=3200;
         const sum=c.createGain(); sum.connect(dist).connect(bp).connect(lp).connect(bus).connect(out);
+
         for(let v=0; v<voices; v++){
           const det=(v===0?-detCents:+detCents);
           const o=c.createOscillator(); o.type='sawtooth';
-          const g=c.createGain(); const f0=620*pitch;
-          o.frequency.setValueAtTime(f0,tt); o.detune.setValueAtTime(det,tt);
+          const g=c.createGain();
+          const f0=620*pitch;
+          o.frequency.setValueAtTime(f0,tt);
+          o.detune.setValueAtTime(det,tt);
           o.frequency.linearRampToValueAtTime(f0*1.16, tt+0.05);
           o.frequency.exponentialRampToValueAtTime(f0*0.26, tt+len*0.85);
-          g.gain.setValueAtTime(0.0001,tt); g.gain.exponentialRampToValueAtTime(0.95,tt+0.035);
+          g.gain.setValueAtTime(0.0001,tt);
+          g.gain.exponentialRampToValueAtTime(0.95,tt+0.035);
           g.gain.exponentialRampToValueAtTime(0.0001,tt+len);
+
           const trem=c.createOscillator(); trem.frequency.value=tremHz;
-          const tremAmt=c.createGain(); tremAmt.gain.value=0.7; trem.connect(tremAmt.gain); g.connect(tremAmt);
-          o.connect(g).connect(sum); trem.start(tt); trem.stop(tt+len); o.start(tt); o.stop(tt+len);
+          const tremAmt=c.createGain(); tremAmt.gain.value=0.7;
+          trem.connect(tremAmt.gain); g.connect(tremAmt);
+          o.connect(g).connect(sum);
+          trem.start(tt); trem.stop(tt+len);
+          o.start(tt);    o.stop(tt+len);
         }
         const nb=c.createBuffer(1, Math.floor(c.sampleRate*len), c.sampleRate);
         const nd=nb.getChannelData(0); for(let i=0;i<nd.length;i++) nd[i]=Math.random()*2-1;
         const n=c.createBufferSource(); n.buffer=nb;
         const nBP=c.createBiquadFilter(); nBP.type='bandpass'; nBP.frequency.value=2400; nBP.Q.value=6;
-        const ng=c.createGain(); ng.gain.setValueAtTime(0.001, tt+0.03); ng.gain.exponentialRampToValueAtTime(0.22, tt+0.08);
+        const ng=c.createGain(); ng.gain.setValueAtTime(0.001, tt+0.03);
+        ng.gain.exponentialRampToValueAtTime(0.22, tt+0.08);
         ng.gain.exponentialRampToValueAtTime(0.0001, tt+len);
-        n.connect(nBP).connect(ng).connect(sum); n.start(tt); n.stop(tt+len);
+        n.connect(nBP).connect(ng).connect(sum);
+        n.start(tt); n.stop(tt+len);
       }
     }
 
+    // ---- mini “aa” visual vicino all’elemento
     function spawnMiniAAnearEl(el){
-      const aa=document.createElement('span'); aa.className='miniAA'; aa.textContent='aa';
+      const aa=document.createElement('span');
+      aa.className='miniAA'; aa.textContent='aa';
       const r=el.getBoundingClientRect(), rs=stage.getBoundingClientRect();
-      aa.style.left = (r.left - rs.left + 18) + 'px'; aa.style.top  = (r.top  - rs.top  - 12) + 'px';
-      stage.appendChild(aa); aa.style.animation='aaPop .24s ease-out forwards'; onTimer(()=>aa.remove(),260);
+      aa.style.left = (r.left - rs.left + 18) + 'px';
+      aa.style.top  = (r.top  - rs.top  - 12) + 'px';
+      stage.appendChild(aa);
+      aa.style.animation='aaPop .24s ease-out forwards';
+      onTimer(()=>aa.remove(),260);
     }
 
+    // ---- Uova + schiusa
     function dropEggAt(lanePct, at, hatchMode){
       const c=ac(); const ms=Math.max(0,(at - c.currentTime)*1000);
       onTimer(()=>{
         const e=document.createElement('span'); e.className='egg'; e.textContent='🥚';
         const size=30 + Math.round(Math.random()*8);
-        e.style.fontSize = size+'px'; e.style.left = `calc(${lanePct}% - ${size/2}px)`;
-        e.style.setProperty('--x', (Math.random()*8 - 4) + 'px'); e.style.animation='fall 1.12s linear forwards';
+        e.style.fontSize = size+'px';
+        e.style.left = `calc(${lanePct}% - ${size/2}px)`;
+        e.style.setProperty('--x', (Math.random()*8 - 4) + 'px');
+        e.style.animation='fall 1.12s linear forwards';
         stage.appendChild(e);
+
         if (hatchMode){
           if (hatchMode==='air'){
             onTimer(()=>{ e.textContent='🐣'; spawnMiniAAnearEl(e); }, 480);
@@ -367,6 +413,7 @@
       }, ms);
     }
 
+    // ---- Urlo principale 3s (invariato)
     function chickenScream3s(c, t, out){
       setScream(true);
       const len=3.0;
@@ -398,10 +445,13 @@
       const d=nbuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
       const n=c.createBufferSource(); n.buffer=nbuf;
       const nBP=c.createBiquadFilter(); nBP.type='bandpass'; nBP.frequency.value=2600; nBP.Q.value=6;
-      const ng=c.createGain(); ng.gain.setValueAtTime(0.001, t+0.08); ng.gain.exponentialRampToValueAtTime(0.5, t+0.22);
+      const ng=c.createGain(); ng.gain.setValueAtTime(0.001, t+0.08);
+      ng.gain.exponentialRampToValueAtTime(0.5, t+0.22);
       ng.gain.exponentialRampToValueAtTime(0.0001, t+len);
-      n.connect(nBP).connect(ng).connect(bus); n.start(t); n.stop(t+len);
+      n.connect(nBP).connect(ng).connect(bus);
+      n.start(t); n.stop(t+len);
 
+      // tick + uova leggere durante lo scream per continuità
       for (let x=t+0.10; x < t+len-0.06; x += 0.25){
         hatClick(c, x, out, 0.18);
         const lane = (Math.round((x - t)/0.25) % 2) ? 31 : 50;
@@ -412,6 +462,7 @@
       return t+len;
     }
 
+    // ---- Misura 2s con swing + fill ogni 4 + pump
     function scheduleMeasure(c, start, out){
       const isFill = ((++MEASURE % 4) === 0);
       const dur=2.0, beat=0.5;
@@ -423,24 +474,31 @@
 
       for(let i=0;i<4;i++){
         const t = start + i*beat;
-        pulseWing(); pumpChickenAt(t);
+        pulseWing();
+        pumpChickenAt(t); // pompa sui quarti
 
         if (i===0 || i===2){ kickPlop(c,t,out); thumpAt(c,t); }
         else               { snareCluck(c,t,out); }
 
+        // quarti
         hatClick(c,t,out, isFill?0.30:0.42);
         dropEggAt([12,69,31,88][i], t, Math.random()<0.18 ? (Math.random()<0.5?'air':'ground') : null);
 
+        // off-beat con swing
         const off = t + beat/2 + (SWING*beat);
         hatClick(c, off, out, isFill?0.30:0.42);
         dropEggAt([50,31,50,69][i], off, Math.random()<0.28 ? (Math.random()<0.5?'air':'ground') : null);
 
-        if (Math.random() < 0.85) babyTherapyAA(c, off, out, { cluster: isFill?3:2, voices:2 });
+        // mini “aa”
+        if (Math.random() < (0.85)){
+          babyTherapyAA(c, off, out, { cluster: isFill?3:2, voices:2 });
+        }
         if (i===1 || i===3){
           const s16=beat/4, preSnare=t - s16 + (SWING*beat*0.5);
           if (preSnare > start) babyTherapyAA(c, preSnare, out, { cluster:2, voices:2, pitch:1.5, len:0.30 });
         }
 
+        // fill densità extra
         if (isFill && i>=2){
           const s16=beat/4;
           [t+s16, t+2*s16, t+3*s16].forEach(tt=>{
@@ -455,6 +513,7 @@
 
     function restartProgress(){ bar.style.animation='none'; bar.offsetHeight; bar.style.animation=null; }
 
+    // crea/assicurati master bus
     function ensureMaster(){
       const c=ac();
       if (!master){
@@ -465,7 +524,8 @@
         comp.attack.value=0.002; comp.release.value=0.10;
         master.connect(softLim).connect(comp).connect(c.destination);
       }
-      const now=c.currentTime+0.0005;
+      /* >>> PATCH: ripristina livello per i restart <<< */
+      const now=c.currentTime+0.001;
       try{
         master.gain.cancelScheduledValues(now);
         master.gain.setValueAtTime(1.10, now);
@@ -474,10 +534,13 @@
     }
 
     async function startLoop(){
-      await unlockAudio();
       const c=ensureMaster();
+      try{ await c.resume(); }catch(e){}
+      if (c.state!=='running') return;
+
       if (cleanup) { try{ cleanup(); }catch(e){} }
-      clearAllTimers(); if (loopTimer) { clearInterval(loopTimer); loopTimer=null; }
+      clearAllTimers();
+      if (loopTimer) { clearInterval(loopTimer); loopTimer=null; }
       MEASURE=0;
 
       let base=c.currentTime+0.08;
@@ -487,13 +550,15 @@
       scheduleMeasure(c, afterS+0.06, master);
 
       loopTimer=setInterval(()=>{
-        base += 5.0; restartProgress();
+        base += 5.0;
+        restartProgress();
         const endS=chickenScream3s(c, base, master);
         scheduleMeasure(c, endS+0.06, master);
       }, 5000);
 
-      cleanup=()=>{ // stop rapido
-        try{ clearInterval(loopTimer); }catch(e){} loopTimer=null;
+      cleanup=()=>{ // stop istantaneo
+        try{ clearInterval(loopTimer); }catch(e){}
+        loopTimer=null;
         clearAllTimers();
         const now=c.currentTime;
         try{
@@ -509,15 +574,14 @@
 
     function stopLoop(){
       if (cleanup) { try{ cleanup(); }catch(e){} }
+      // non sospendo l'audio context: restart immediato
       startBtn.style.display='inline-block'; stopBtn.style.display='none';
     }
 
+    // EGGSplosion (anche a loop fermo)
     async function triggerEggsplosionBurst(){
-      await unlockAudio();
       const c=ensureMaster();
-      // suono immediato (senza timer) per iOS
-      babyTherapyAA(c, c.currentTime, master, { cluster:2, voices:2, pitch:1.62 });
-
+      try{ await c.resume(); }catch(e){}
       const now=c.currentTime+0.03;
       for(let wave=0; wave<3; wave++){
         const base=now + wave*0.38;
@@ -531,6 +595,7 @@
       }
     }
 
+    // UI
     if (startBtn){
       startBtn.addEventListener('click', startLoop, {passive:true});
       stopBtn .addEventListener('click', stopLoop,  {passive:true});
