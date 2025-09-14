@@ -277,6 +277,21 @@
       ws.curve=curve; ws.oversample='4x'; return ws;
     }
 
+    // ---- UNLOCK audio mobile (una sola volta da gesto)
+    let audioUnlocked = false;
+    function ensureAudioUnlocked() {
+      const c = ac(); if (audioUnlocked || !c) return;
+      try {
+        const len = 0.01;
+        const buf = c.createBuffer(1, Math.ceil(c.sampleRate*len), c.sampleRate);
+        const src = c.createBufferSource(); src.buffer = buf;
+        const g = c.createGain(); g.gain.value = 0.00001;
+        src.connect(g).connect(c.destination);
+        src.start();
+        audioUnlocked = true;
+      } catch(e){}
+    }
+
     // ---- Visual  
     function setScream(on){  
       stage.classList.toggle('scream', !!on);  
@@ -285,15 +300,25 @@
       shoutEl.style.opacity = on ? '1' : '0';
       shoutEl.style.transform='translateX(-50%)';
     }  
-    function pulseWing(){ stage.classList.add('beat'); onTimer(()=>stage.classList.remove('beat'), 150); }  
-    function pumpChickenAt(when){  
-      const c = ac();  
-      const ms = Math.max(0, (when - c.currentTime) * 1000);  
-      onTimer(()=>{  
-        chicken.classList.remove('pump'); void chicken.offsetWidth; chicken.classList.add('pump');  
-        if (crestEl){ crestEl.classList.remove('bob'); void crestEl.offsetWidth; crestEl.classList.add('bob'); }  
-      }, ms);  
-    }  
+    // (anti-jank) toggle a inizio frame
+    function pulseWing(){
+      if (!stage.classList.contains('beat')) {
+        requestAnimationFrame(()=>{
+          stage.classList.add('beat');
+          setTimeout(()=>stage.classList.remove('beat'), 120);
+        });
+      }
+    }
+    function pumpChickenAt(when){
+      const c = ac();
+      const ms = Math.max(0, (when - c.currentTime) * 1000);
+      setTimeout(()=>{
+        requestAnimationFrame(()=>{
+          chicken.classList.remove('pump'); void chicken.offsetWidth; chicken.classList.add('pump');
+          if (crestEl){ crestEl.classList.remove('bob'); void crestEl.offsetWidth; crestEl.classList.add('bob'); }
+        });
+      }, ms);
+    }
     function thumpAt(c, when){  
       const ms = Math.max(0, (when - c.currentTime) * 1000);  
       onTimer(()=>{  
@@ -302,13 +327,14 @@
       }, ms);  
     }  
 
-    // >>> PATCH: pool uova per fluidità mobile
+    // >>> PATCH: pool uova per fluidità mobile (con release su animationend)
     const EGG_POOL_SIZE = IS_MOBILE ? 28 : 60;
     const eggPool = [];
     function initEggPool(){
       if (eggPool.length) return;
       for(let i=0;i<EGG_POOL_SIZE;i++){
         const e=document.createElement('span'); e.className='egg'; e.textContent='🥚'; e.style.display='none';
+        e.addEventListener('animationend', () => releaseEggEl(e));
         stage.appendChild(e); eggPool.push(e);
       }
     }
@@ -317,6 +343,24 @@
       return eggPool[0];
     }
     function releaseEggEl(e){ e.style.display='none'; e.textContent='🥚'; e.style.animation='none'; void e.offsetWidth; }
+
+    // >>> PATCH: pool mini "aa" (riduce jank) + throttle 26ms
+    const AA_POOL_SIZE = IS_MOBILE ? 16 : 24;
+    const aaPool = [];
+    function initAAPool(){
+      if (aaPool.length) return;
+      for(let i=0;i<AA_POOL_SIZE;i++){
+        const s=document.createElement('span');
+        s.className='miniAA'; s.textContent='aa'; s.style.display='none';
+        stage.appendChild(s);
+        aaPool.push(s);
+      }
+    }
+    function getAAEl(){
+      for (const s of aaPool){ if (s.style.display==='none'){ s.style.display=''; return s; } }
+      return aaPool[0];
+    }
+    function releaseAAEl(s){ s.style.display='none'; s.style.animation='none'; void s.offsetWidth; }
 
     // ---- Suoni base  
     function kickPlop(c, t, out){  
@@ -351,10 +395,11 @@
     }  
 
     // ---- Mini “aa”  
+    let lastAATime=0;
     function babyTherapyAA(c, t, out, {  
       len=0.34, pitch=1.6, gain=0.62, detCents=10, tremHz=14, distAmt=18, voices=2, cluster=2, clusterGap=0.035  
     } = {}){  
-      if (IS_MOBILE){ gain *= 1.0; } // più botta ma limiter tiene pulito
+      if (IS_MOBILE){ gain *= 1.0; }
       for (let k=0;k<cluster;k++){  
         if (VOICES_NOW > VOICE_BUDGET) break;
         const tt=t+k*clusterGap;  
@@ -407,20 +452,20 @@
       }  
     }  
 
-    // ---- mini “aa” visual vicino all’elemento (throttle leggero per fluidità)  
-    let lastAATime=0;
-    function spawnMiniAAnearEl(el){  
+    // ---- mini “aa” visual con pool + throttle 26ms
+    function spawnMiniAAnearEl(el){
+      initAAPool();
       const now=performance.now();
-      if (IS_MOBILE && now - lastAATime < 40) return; // 25fps minimo per evitare jank
+      if (IS_MOBILE && now - lastAATime < 26) return;
       lastAATime=now;
-      const aa=document.createElement('span');  
-      aa.className='miniAA'; aa.textContent='aa';  
-      const r=el.getBoundingClientRect(), rs=stage.getBoundingClientRect();  
-      aa.style.left = (r.left - rs.left + 18) + 'px';  
-      aa.style.top  = (r.top  - rs.top  - 12) + 'px';  
-      stage.appendChild(aa);  
-      aa.style.animation='aaPop .24s ease-out forwards';  
-      onTimer(()=>aa.remove(),260);  
+      const s=getAAEl();
+      const r=el.getBoundingClientRect(), rs=stage.getBoundingClientRect();
+      s.style.left = (r.left - rs.left + 18) + 'px';
+      s.style.top  = (r.top  - rs.top  - 12) + 'px';
+      s.style.display='';
+      s.style.animation='none'; void s.offsetWidth;
+      s.style.animation='aaPop .24s ease-out forwards';
+      onTimer(()=>releaseAAEl(s), 260);
     }  
 
     // ---- Uova + schiusa (pool)  
@@ -444,9 +489,26 @@
             if (master) babyTherapyAA(c, c.currentTime+1.08, master, { cluster:3, voices:2, pitch:1.55 });  
           }  
         }  
+        // release via animationend; backup timer comunque:
         onTimer(()=>releaseEggEl(e), 1500);  
       }, ms);  
     }  
+
+    // ---- Botta corta sub per EGGSplosion
+    function boomPunch(c, t, out) {
+      const len = 0.16;
+      const nb = c.createBuffer(1, Math.ceil(c.sampleRate*len), c.sampleRate);
+      const d = nb.getChannelData(0);
+      for (let i=0;i<d.length;i++){ const x=i/d.length; d[i]=(Math.random()*2-1)*(1-x)*(1-x); }
+      const n = c.createBufferSource(); n.buffer = nb;
+      const lp = c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 220;
+      const g  = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(IS_MOBILE ? 1.05 : 1.10, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+      n.connect(lp).connect(g).connect(out);
+      n.start(t); n.stop(t+len);
+    }
 
     // ---- Urlo principale 3s (come tuo)  
     function chickenScream3s(c, t, out){  
@@ -579,9 +641,7 @@
       const c=ac();  
       if (!master) buildMaster(c);
       if (c.state !== 'running' && c.resume) { try { c.resume(); } catch(e){} }  
-      // reattach in caso di ricreazione context
       try{
-        // no-op: catena già collegata; se context ricreato, rebuild
         if (master.context !== c) { buildMaster(c); }
       }catch(e){ buildMaster(c); }
       return c;  
@@ -595,6 +655,8 @@
       MEASURE=0;  
 
       initEggPool();  
+      initAAPool();
+      VOICES_NOW = 0; // reset budget audio su start
 
       let base=c.currentTime+0.08;  
       stage.classList.add('playing'); restartProgress();  
@@ -620,6 +682,10 @@
           master.gain.setValueAtTime(master.gain.value, now);  
           master.gain.linearRampToValueAtTime(0.0001, now + 0.08);  
         }catch(e){}  
+        // reset pool visivo per evitare “blocco” alla ripartenza
+        eggPool.forEach(e => { try{ releaseEggEl(e); }catch(_){} });
+        aaPool.forEach(s => { try{ releaseAAEl(s); }catch(_){} });
+        VOICES_NOW = 0; // azzera contatore voci
         stage.classList.remove('playing'); setScream(false);  
       };  
 
@@ -634,17 +700,24 @@
     // EGGSplosion (anche a loop fermo) — più delirio su desktop, forte e pulito su mobile  
     function triggerEggsplosionBurst(){  
       const c=ensureMaster();  
+      ensureAudioUnlocked();
+      if (c.resume) { try{ c.resume(); }catch(e){} }
+
       initEggPool();  
+      initAAPool();
       transientPunch(1.12);  
       const now=c.currentTime+0.02;  
 
-      const WAVES = IS_MOBILE ? 3 : 3;               // uguale #ondate
-      const EGGS_PER_WAVE = IS_MOBILE ? 16 : 22;     // desktop più fitto
-      const STEP = IS_MOBILE ? 0.022 : 0.018;        // desktop più stretto
-      const CLUSTER = IS_MOBILE ? 2 : 3;             // cluster audio
+      const WAVES = 3;
+      const EGGS_PER_WAVE = IS_MOBILE ? 16 : 24; // desktop un filo più fitto
+      const STEP = IS_MOBILE ? 0.022 : 0.017;    // desktop più stretto
+      const CLUSTER = IS_MOBILE ? 2 : 3;
 
       for(let wave=0; wave<WAVES; wave++){  
         const base=now + wave*0.36;  
+        // botta sub upfront
+        boomPunch(c, base, master);
+
         for(let i=0;i<EGGS_PER_WAVE;i++){  
           const t=base + i*STEP;  
           const lane=LANES[Math.floor(Math.random()*LANES.length)];  
@@ -657,17 +730,16 @@
       }  
     }  
 
-    // >>> PATCH: eventi su pointerdown per garantire gesto utente su desktop+mobile  
+    // >>> eventi: pointerdown (latency zero) + unlock su primo gesto
     if (startBtn){  
       startBtn.addEventListener('pointerdown', startLoop, {passive:true});  
       stopBtn .addEventListener('pointerdown', stopLoop,  {passive:true});  
       eggBtn  .addEventListener('pointerdown', triggerEggsplosionBurst, {passive:true});  
-      // pre-warm al primo tocco
-      startBtn.addEventListener('pointerdown', ensureMaster, {passive:true, once:true});
-      eggBtn  .addEventListener('pointerdown', ensureMaster, {passive:true, once:true});
+      startBtn.addEventListener('pointerdown', ()=>{ ensureMaster(); ensureAudioUnlocked(); ac().resume?.(); }, {passive:true, once:true});
+      eggBtn  .addEventListener('pointerdown', ()=>{ ensureMaster(); ensureAudioUnlocked(); ac().resume?.(); }, {passive:true, once:true});
     }  
 
-    // >>> PATCH: se si torna visibile, riprendi l’audio  
+    // >>> se si torna visibili, riprendi l’audio  
     document.addEventListener('visibilitychange', () => {
       const c = ctx; if (!c) return;
       if (document.visibilityState === 'visible' && c.state !== 'running' && c.resume) {
@@ -677,7 +749,9 @@
 
   })();  
   </script>  </body>  
-</html>
+</html> 
+
+
 
 
 
