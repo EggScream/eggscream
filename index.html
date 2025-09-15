@@ -17,7 +17,6 @@
     html,body{margin:0;background:var(--offwhite);color:var(--ink)}
     body{font:16px/1.4 "Comic Neue", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif}
 
-    /* --- Hero full bleed con strisce oblique --- */
     .hero{
       min-height:100dvh; display:flex; align-items:center; justify-content:center; padding:48px 18px;
       background:
@@ -30,7 +29,6 @@
       box-shadow:0 28px 60px rgba(0,0,0,.25);
     }
 
-    /* Badge/tag sopra il bottone */
     .tag{
       display:inline-block; background:#fff; border:4px solid #111; border-radius:999px;
       padding:.35rem .8rem; font-family:"Bangers", system-ui; letter-spacing:.02em; font-size:clamp(14px,2.6vw,18px);
@@ -42,7 +40,6 @@
     }
     .sub{ margin:.25rem 0 0; font-weight:700; font-size:clamp(16px,3.2vw,22px); }
 
-    /* Gallina gigante / STAGE */
     .stage{
       position:relative; margin:24px auto 0; height:320px; border:3px dashed var(--line); border-radius:22px;
       display:flex; align-items:center; justify-content:center; background:linear-gradient(#fff,#fafafa); overflow:hidden;
@@ -52,38 +49,31 @@
     .spark.s1{ left:14%; top:22% } .spark.s2{ right:12%; top:18% } .spark.s3{ left:10%; bottom:14% } .spark.s4{ right:8%; bottom:12% }
     @keyframes pop{ 0%,100%{ transform:scale(1) rotate(0) } 50%{ transform:scale(1.2) rotate(10deg) } }
 
-    /* >>> PATCH: centratura reale + origin coerente <<< */
     .chicken{
       width:min(360px,76vw);
       transform:rotate(-4deg);
       transform-origin:center center;
       position:relative;
-      margin:0 auto; /* centra nello stage */
+      margin:0 auto;
       will-change:transform;
     }
 
-    /* ---- VITA DEL POLLO ---- */
-    /* Occhio blink */
     .eye{ animation:eyeBlink 4.2s infinite; transform-origin:170px 105px }
     @keyframes eyeBlink{ 0%,96%,100%{ transform:scaleY(1) } 98%{ transform:scaleY(.1) } }
 
-    /* Cresta viva (idle + durante scream) */
     .crest{ transform-origin:170px 82px; animation:crestBlink .9s steps(2,end) infinite }
     @keyframes crestBlink{ 0%,100%{ fill:var(--red) } 50%{ fill:var(--blue) } }
     .scream .crest{ animation:crestSway .18s ease-in-out infinite }
     @keyframes crestSway{ 0%{transform:rotate(0)} 50%{transform:rotate(-7deg)} 100%{transform:rotate(0)} }
 
-    /* Becco */
     .beak-upper,.beak-lower{ transform-origin:182px 120px; transition:transform .08s ease }
     .scream .beak-upper{ transform:rotate(-22deg) translateY(-2px) }
     .scream .beak-lower{ transform:rotate(22deg) translateY(6px) }
 
-    /* Ala “pompa” a tempo */
     .wing{ transform-origin:125px 125px }
     .beat .wing{ animation:flap .24s ease-out }
     @keyframes flap{ 0%{transform:rotate(0)} 50%{transform:rotate(-8deg)} 100%{transform:rotate(0)} }
 
-    /* >>> PATCH: respiro + pump senza translateX <<< */
     .chicken.breathe { animation: chickenBreathe 3s ease-in-out infinite }
     @keyframes chickenBreathe {
       0%,100%{ transform:rotate(-4deg) scale(1) }
@@ -98,7 +88,6 @@
     .crest.bob { animation: crestBob .12s ease-out 1; transform-origin:170px 82px }
     @keyframes crestBob { 0%{transform:rotate(0)} 50%{transform:rotate(-7deg)} 100%{transform:rotate(0)} }
 
-    /* AAA fisso vicino al becco */
     .shout{
       position:absolute; left:calc(50% + 150px); top:86px; transform:translateX(-50%) rotate(-3deg);
       font-family:"Bangers"; font-size:clamp(22px,4.5vw,36px); color:#FF0033; text-shadow:0 3px #fff, 3px 3px #111;
@@ -106,7 +95,6 @@
     }
     .scream .shout{ opacity:1; transform:translateX(-50%) }
 
-    /* Emoji uova che cadono + schiusa */
     .egg, .chickAA{
       position:absolute; will-change:transform,opacity; filter:drop-shadow(0 2px 2px rgba(0,0,0,.15));
       pointer-events:none; z-index:3;
@@ -120,11 +108,9 @@
     @keyframes chickPop{ 0%{ transform:translateY(28px); opacity:0 } 35%{ transform:translateY(-4px); opacity:1 } 100%{ transform:translateY(16px); opacity:0 } }
     @keyframes chickFall{ 0%{ transform:translateY(-40px) rotate(-25deg); opacity:0 } 15%{ opacity:1 } 100%{ transform:translateY(220px) rotate(25deg); opacity:.98 } }
 
-    /* mini “aa” vicino alla schiusa */
     .miniAA{ position:absolute; font-weight:900; font-size:14px; color:#e11; text-shadow:0 1px 0 #fff,1px 1px 0 rgba(0,0,0,.14); opacity:0; z-index:4 }
     @keyframes aaPop{ 0%{transform:translateY(0) scale(.8);opacity:0} 30%{opacity:1} 100%{transform:translateY(-8px) scale(1.06);opacity:0} }
 
-    /* Pulsantone giallo + pulse rosso ogni ~2s */
     .cta{
       position:relative; display:inline-block; margin-top:22px; padding:1.05rem 1.35rem;
       background:var(--yellow); color:#111; text-decoration:none;
@@ -142,22 +128,18 @@
     .cta:hover{ filter:saturate(1.1) }
     .cta:active{ transform:translateY(2px); box-shadow:0 6px 0 #111 }
 
-    /* Disclaimer */
     .disclaimers{ margin:14px auto 0; max-width:680px; list-style:none; padding:0; color:#333; font-weight:700; font-size:clamp(12px,2.6vw,14px) }
     .disclaimers li{ margin:.25rem 0 }
 
-    /* Barra di progresso sottile (sopra stage, opzionale) */
     .measure{position:absolute; left:0; right:0; top:0; height:6px; background:rgba(0,0,0,.06)}
     .bar{position:absolute; left:0; top:0; bottom:0; width:0; background:linear-gradient(90deg,#ff8a8a 0 60%, #88c7ff 60% 100%); border-bottom-right-radius:6px}
     .playing .bar{ animation:measure 5s linear infinite }
     @keyframes measure{from{width:0} to{width:100%}}
 
-    /* Controlli post-pagamento (restano invisibili finché non success=1) */
     .controls{ display:none; gap:10px; justify-content:center; margin:16px 0 0 }
     .controls .btn{ border:3px solid #111; background:#fff; padding:.6rem .9rem; border-radius:12px; font-weight:900; cursor:pointer }
     .controls .btn:active{ transform:translateY(1px) }
 
-    /* Modale pagamento */
     .modal{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); backdrop-filter:blur(3px);
       align-items:center; justify-content:center; z-index:100 }
     .modal:target{ display:flex }
@@ -173,6 +155,11 @@
       display:inline-block; margin-top:12px; padding:.6rem .9rem; border:3px solid #111; border-radius:12px;
       background:#f3f3f3; text-decoration:none; color:#111; font-weight:900;
     }
+
+    /* >>> NEW: stato disabled per il bottone EGGSplosion */
+    .btn[disabled]{
+      opacity:.55; cursor:not-allowed; filter:grayscale(.3);
+    }
   </style>
 </head>
 <body>
@@ -184,11 +171,9 @@
 
       <div class="stage" id="stage" aria-hidden="true">
         <div class="measure"><div class="bar"></div></div>
-        <!-- decor “fairground” -->
         <div class="spark s1">⭐</div><div class="spark s2">⭐</div>
         <div class="spark s3">⭐</div><div class="spark s4">⭐</div>
 
-        <!-- gallina -->
         <div class="chicken">
           <svg viewBox="0 0 260 210" aria-hidden="true">
             <g class="body">
@@ -217,7 +202,6 @@
         <li>As American as fried chicken at 3 AM.</li>
       </ul>
 
-      <!-- Controlli che compaiono post-pagamento -->
       <div class="controls" id="controls">
         <button id="startBtn" class="btn">🔊 Start Beat</button>
         <button id="stopBtn"  class="btn" style="display:none">🛑 Stop</button>
@@ -226,7 +210,6 @@
     </section>
   </main>
 
-  <!-- Modal pagamento -->
   <div id="pay" class="modal" onclick="location.hash=''">
     <div class="sheet" onclick="event.stopPropagation()">
       <h3 style="font-family:'Bangers'; font-size:28px; margin:0 0 .25rem">INSERT $1</h3>
@@ -237,7 +220,7 @@
   </div>
 
   <script>
-  // ===== AUDIO + VISUAL ENGINE (rev. definitive) =====
+  // ===== AUDIO + VISUAL ENGINE (rev. stabile) =====
   (function(){
     const stage    = document.getElementById('stage');
     const bar      = stage.querySelector('.bar');
@@ -248,26 +231,24 @@
     const chicken  = stage.querySelector('.chicken');
     const crestEl  = stage.querySelector('.crest');
 
-    // --- Flags & Profiles ---
     const IS_MOBILE = (('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0) ||
                       (window.matchMedia && window.matchMedia('(pointer:coarse)').matches));
 
-    // Profili separati
     const PROF = IS_MOBILE ? {
-      LOOKAHEAD: 0.28,      // quanto schedulare in anticipo (audio)
-      TICK_MS:   35,        // quanto spesso svegliare lo scheduler
-      VOICE_BUDGET: 26,     // limite “voci” simultanee
+      LOOKAHEAD: 0.28,
+      TICK_MS:   35,
+      VOICE_BUDGET: 28,          // >>> FIX: leggermente più alto ma protetto
       EGGS_PER_WAVE: 14,
-      EGG_POOL: 30,
+      EGG_POOL: 36,              // >>> FIX: pool più ampio
       MINI_AA_COOLDOWN_MS: 70,
       SWING: 0.03
     } : {
-      LOOKAHEAD: 0.36,
-      TICK_MS:   25,
-      VOICE_BUDGET: 120,
-      EGGS_PER_WAVE: 24,
-      EGG_POOL: 64,
-      MINI_AA_COOLDOWN_MS: 36,
+      LOOKAHEAD: 0.40,
+      TICK_MS:   22,
+      VOICE_BUDGET: 140,
+      EGGS_PER_WAVE: 26,
+      EGG_POOL: 72,
+      MINI_AA_COOLDOWN_MS: 34,
       SWING: 0.04
     };
 
@@ -277,25 +258,36 @@
       controls.style.display = 'flex';
     }
 
-    // Idle breathing
     chicken.classList.add('breathe');
 
     // ---------- Audio Context & Master ----------
     let ctx = null;
     let master, preSat, comp, hardLim;
-    let NOISE_BUF = null;  // riuso noise (niente alloc/GC durante spam)
+    let NOISE_BUF = null;
 
     function ac(){
       if (!ctx || ctx.state === 'closed') {
-        // Lascia scegliere sampleRate al device (Android fix)
         ctx = new (window.AudioContext||window.webkitAudioContext)({ latencyHint:'interactive' });
       }
       return ctx;
     }
 
+    // >>> NEW: voice accounting corretto
+    let VOICES_NOW = 0;
+    function _inc(){ VOICES_NOW++; }
+    function _dec(){ VOICES_NOW = Math.max(0, VOICES_NOW-1); }
+    function trackNode(node, fallbackMs=300){
+      _inc();
+      const tidy = ()=>{ node.removeEventListener?.('ended', tidy); _dec(); };
+      try{ node.addEventListener?.('ended', tidy, {once:true}); }catch(e){}
+      // fallback se ended non arriva
+      setTimeout(tidy, fallbackMs+20);
+    }
+    function headroom(){ return Math.max(0, PROF.VOICE_BUDGET - VOICES_NOW); }
+
     function mkWaveShaper(curveFn){
       const c = ac();
-      const n = 2048, curve = new Float32Array(n);
+      const n = 4096, curve = new Float32Array(n); // >>> FIX: curva più fine
       for (let i=0;i<n;i++){ const x = i/n*2-1; curve[i] = curveFn(x); }
       const ws = c.createWaveShaper();
       ws.curve = curve; ws.oversample = '4x';
@@ -305,17 +297,24 @@
     function buildMaster(){
       const c = ac();
       master = c.createGain();
-      preSat = mkWaveShaper(x => Math.tanh((IS_MOBILE?18:12) * x));
+
+      // >>> FIX: saturazione più dolce per mix “pulito”
+      preSat = mkWaveShaper(x => Math.tanh((IS_MOBILE?10:8) * x));
       comp   = c.createDynamicsCompressor();
-      comp.threshold.value = IS_MOBILE ? -6 : -10;
-      comp.knee.value = 8; comp.ratio.value = IS_MOBILE ? 12 : 6;
-      comp.attack.value = 0.002; comp.release.value = 0.10;
-      hardLim = mkWaveShaper(x => Math.max(-0.9, Math.min(0.9, x)));
+      comp.threshold.value = IS_MOBILE ? -8 : -12;
+      comp.knee.value = 12; comp.ratio.value = IS_MOBILE ? 10 : 6;
+      comp.attack.value = 0.003; comp.release.value = 0.12;
+
+      // soft-clipper
+      hardLim = mkWaveShaper(x => {
+        const k = 0.95; // soft
+        return Math.max(-k, Math.min(k, x));
+      });
+
       master.connect(preSat).connect(comp).connect(hardLim).connect(c.destination);
       const now = c.currentTime + 0.001;
-      master.gain.setValueAtTime(IS_MOBILE ? 1.18 : 1.10, now);
+      master.gain.setValueAtTime(IS_MOBILE ? 1.10 : 1.06, now);
 
-      // Prepara noise buffer (1s) riusabile
       if (!NOISE_BUF){
         NOISE_BUF = c.createBuffer(1, Math.floor(c.sampleRate * 1.0), c.sampleRate);
         const d = NOISE_BUF.getChannelData(0);
@@ -331,13 +330,14 @@
       return c;
     }
 
-    // --- Robust mobile unlock (Android/iOS) ---
+    // --- Robust mobile unlock
     function unlockOnce(){
       const c = ensureMaster();
       try {
         const src = c.createBufferSource();
         const b = c.createBuffer(1, 1, c.sampleRate);
         src.buffer = b; src.connect(c.destination); src.start(0);
+        trackNode(src, 30);
       } catch(e){}
       document.removeEventListener('pointerdown', unlockOnce);
       document.removeEventListener('touchstart', unlockOnce);
@@ -345,7 +345,6 @@
     document.addEventListener('pointerdown', unlockOnce, {passive:true, once:true});
     document.addEventListener('touchstart',  unlockOnce, {passive:true, once:true});
 
-    // Resume su ritorno tab (Android fix)
     document.addEventListener('visibilitychange', () => {
       const c = ctx; if (!c) return;
       if (document.visibilityState === 'visible' && c.state !== 'running' && c.resume) {
@@ -394,8 +393,8 @@
     }
     function getEggEl(){
       for (const e of eggPool){ if (e.style.display==='none'){ e.style.display=''; return e; } }
-      // se finito, riusa il primo (meglio visual continuo che allocare)
-      return eggPool[0];
+      // riuso il primo, ma resetta anim
+      const e = eggPool[0]; e.style.display=''; return e;
     }
     function releaseEggEl(e){ e.style.display='none'; e.textContent='🥚'; e.style.animation='none'; void e.offsetWidth; }
 
@@ -416,22 +415,19 @@
     }
 
     // ---------- Audio building blocks ----------
-    let VOICES_NOW = 0;
-    function voiceUsed(forMs){ VOICES_NOW++; setTimeout(()=>{ VOICES_NOW--; }, forMs|0); }
-    const LANES = [12,31,50,69,88];
-
-    function hatClick(t, out, gain=0.42){
+    function hatClick(t, out, gain=0.42, open=false){
       const c = ac();
       const src = c.createBufferSource();
       src.buffer = NOISE_BUF;
-      const hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=5000;
+      const hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value= open ? 3000 : 5000;
       const g = c.createGain();
+      const len = open ? 0.14 : 0.06;
       g.gain.setValueAtTime(gain, t);
-      g.gain.exponentialRampToValueAtTime(0.0001, t+0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+len);
       src.connect(hp).connect(g).connect(out);
       src.start(t);
-      src.stop(t+0.06);
-      voiceUsed((t - c.currentTime + 70)*1000);
+      src.stop(t+len+0.005);
+      trackNode(src, (len*1000)|0);
     }
 
     function kickPlop(t, out){
@@ -440,34 +436,32 @@
       const g=c.createGain();
       o.frequency.setValueAtTime(140,t);
       o.frequency.exponentialRampToValueAtTime(55,t+0.16);
-      g.gain.setValueAtTime(1.05,t);
+      g.gain.setValueAtTime(1.0,t);
       g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);
       o.connect(g).connect(out); o.start(t); o.stop(t+0.19);
-      voiceUsed((t - c.currentTime + 200)*1000);
+      trackNode(o, 190);
     }
-    function snareCluck(t, out){
+    function snareCluck(t, out, ghost=false){
       const c = ac();
       const o=c.createOscillator(); o.type='square';
       const g=c.createGain();
-      o.frequency.setValueAtTime(750,t);
+      o.frequency.setValueAtTime(ghost? 680:750,t);
       o.frequency.exponentialRampToValueAtTime(300,t+0.07);
-      g.gain.setValueAtTime(0.95,t);
-      g.gain.exponentialRampToValueAtTime(0.0001,t+0.1);
+      g.gain.setValueAtTime(ghost? 0.45:0.95,t);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+0.10);
       o.connect(g).connect(out); o.start(t); o.stop(t+0.11);
-      voiceUsed((t - c.currentTime + 120)*1000);
+      trackNode(o, 120);
     }
 
-    function mkDist(amt=20){ return mkWaveShaper(x=>Math.tanh(amt*x)); }
+    function mkDist(amt=16){ return mkWaveShaper(x=>Math.tanh(amt*x)); } // >>> leggermente meno
 
     function babyTherapyAA(t, out, {
-      len=0.34, pitch=1.6, gain=0.62, detCents=10, tremHz=14, distAmt=18, voices=2, cluster=2, clusterGap=0.035
+      len=0.32, pitch=1.6, gain=0.56, detCents=10, tremHz=14, distAmt=16, voices=2, cluster=2, clusterGap=0.035
     } = {}){
-      const c = ac();
-      const headroom = Math.max(0, PROF.VOICE_BUDGET - VOICES_NOW);
-      if (headroom < 4) { // se saturo, fai 1 solo blip corto
-        voices = 1; cluster = 1; gain *= 0.6; len *= 0.7;
-      }
+      let hr = headroom();
+      if (hr < 4) { voices = 1; cluster = 1; gain *= 0.6; len *= 0.7; }
 
+      const c = ac();
       for (let k=0;k<cluster;k++){
         const tt = t + k*clusterGap;
 
@@ -481,7 +475,7 @@
         const sum=c.createGain(); sum.connect(dist).connect(bp).connect(lp).connect(bus).connect(out);
 
         for(let v=0; v<voices; v++){
-          if (VOICES_NOW >= PROF.VOICE_BUDGET) break;
+          if (headroom() <= 0) break;
           const o=c.createOscillator(); o.type='sawtooth';
           const g=c.createGain();
           const f0=620*pitch;
@@ -499,19 +493,19 @@
           o.connect(g).connect(sum);
           trem.start(tt); trem.stop(tt+len);
           o.start(tt); o.stop(tt+len);
-          voiceUsed((tt - c.currentTime + len + 20/1000)*1000);
+          trackNode(o, (len*1000)|0);
         }
 
-        // noise layer riusando buffer
-        if (VOICES_NOW < PROF.VOICE_BUDGET){
+        // noise layer
+        if (headroom() > 0){
           const n=c.createBufferSource(); n.buffer=NOISE_BUF;
           const nBP=c.createBiquadFilter(); nBP.type='bandpass'; nBP.frequency.value=2400; nBP.Q.value=6;
           const ng=c.createGain(); ng.gain.setValueAtTime(0.001, tt+0.03);
-          ng.gain.exponentialRampToValueAtTime(0.26, tt+0.08);
+          ng.gain.exponentialRampToValueAtTime(0.24, tt+0.08);
           ng.gain.exponentialRampToValueAtTime(0.0001, tt+len);
           n.connect(nBP).connect(ng).connect(sum);
           n.start(tt); n.stop(tt+len);
-          voiceUsed((tt - c.currentTime + len + 20/1000)*1000);
+          trackNode(n, (len*1000)|0);
         }
       }
     }
@@ -529,13 +523,9 @@
         e.style.animation='fall 1.12s linear forwards';
 
         if (hatchMode){
-          if (hatchMode==='air'){
-            setTimeout(()=>{ e.textContent='🐣'; spawnMiniAAnearEl(e); }, 480);
-            if (master) babyTherapyAA(c.currentTime+0.48, master, { cluster:2, voices:2, pitch:1.65 });
-          } else {
-            setTimeout(()=>{ e.textContent='🐣'; spawnMiniAAnearEl(e); }, 1080);
-            if (master) babyTherapyAA(c.currentTime+1.08, master, { cluster:2, voices:2, pitch:1.55 });
-          }
+          const when = (hatchMode==='air') ? 0.48 : 1.08;
+          setTimeout(()=>{ e.textContent='🐣'; spawnMiniAAnearEl(e); }, when*1000);
+          if (master) babyTherapyAA(c.currentTime + Math.max(0, (ms/1000) + when - 0.01), master, { cluster:2, voices:2, pitch:1.55 + (hatchMode==='air'?0.1:0) });
         }
 
         setTimeout(()=>releaseEggEl(e), 1500);
@@ -548,7 +538,7 @@
       setScream(true);
       const len=3.0;
       const bus=c.createGain(); bus.gain.value=1.0;
-      const dist=mkDist(20);
+      const dist=mkDist(18);
       const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1800; bp.Q.value=4.5;
       const lp=c.createBiquadFilter(); lp.type='lowpass';  lp.frequency.value=2800;
       bus.connect(dist).connect(bp).connect(lp).connect(out);
@@ -561,7 +551,7 @@
         o.frequency.linearRampToValueAtTime(720, t+0.12);
         o.frequency.exponentialRampToValueAtTime(150, t+len*0.92);
         g.gain.setValueAtTime(0.0001,t);
-        g.gain.exponentialRampToValueAtTime(0.95,t+0.06);
+        g.gain.exponentialRampToValueAtTime(0.92,t+0.06);
         g.gain.exponentialRampToValueAtTime(0.0001,t+len);
 
         const trem=c.createOscillator(); trem.frequency.value=13;
@@ -570,10 +560,10 @@
         o.connect(g).connect(bus);
         trem.start(t); trem.stop(t+len);
         o.start(t); o.stop(t+len);
-        voiceUsed((t - c.currentTime + len + 20/1000)*1000);
+        trackNode(o, (len*1000)|0);
       });
 
-      // noise layer per scream
+      // noise layer
       const n=c.createBufferSource(); n.buffer=NOISE_BUF;
       const nBP=c.createBiquadFilter(); nBP.type='bandpass'; nBP.frequency.value=2600; nBP.Q.value=6;
       const ng=c.createGain(); ng.gain.setValueAtTime(0.05, t+0.08);
@@ -581,11 +571,11 @@
       ng.gain.exponentialRampToValueAtTime(0.0001, t+len);
       n.connect(nBP).connect(ng).connect(bus);
       n.start(t); n.stop(t+len);
-      voiceUsed((t - c.currentTime + len + 20/1000)*1000);
+      trackNode(n, (len*1000)|0);
 
-      // tick + uova leggere durante lo scream per continuità
+      // tick + uova leggere
       for (let x=t+0.10; x < t+len-0.06; x += 0.25){
-        hatClick(x, out, 0.18);
+        hatClick(x, out, 0.18, false);
         const lane = (Math.round((x - t)/0.25) % 2) ? 31 : 50;
         dropEggAt(lane, x, null);
       }
@@ -594,56 +584,82 @@
       return t+len;
     }
 
-    // ---------- Measure 2s (kick/snare + swing hats + eggs + AA) ----------
+    // ---------- Groove con variazioni ----------
+    let measureCount = 0;
     function scheduleMeasure(start, out){
-      const c = ac();
       const dur=2.0, beat=0.5;
+
+      // >>> NEW: varietà
+      const ghostOn = (measureCount % 2===1) && Math.random()<0.7;
+      const openHatOn = Math.random()<0.3;
+      const fillOn = (measureCount % 4===3);
+
       for(let i=0;i<4;i++){
         const t = start + i*beat;
 
         pulseWing();
         pumpChickenAt(t);
-        if (i===0 || i===2){ kickPlop(t,out); thumpAt(t); } else { snareCluck(t,out); }
+        if (i===0 || i===2){ kickPlop(t,out); thumpAt(t); } else { snareCluck(t,out, ghostOn && i===3); }
 
         // quarti
-        hatClick(t,out,0.42);
-        dropEggAt([12,69,31,88][i], t, Math.random()<0.18 ? (Math.random()<0.5?'air':'ground') : null);
+        hatClick(t,out,0.42, openHatOn && i===3);
+
+        // schiusa probabilistica per step
+        const hatchP = [0.15, 0.25, 0.18, 0.3][i] + (fillOn? 0.08:0);
+        const hatch = (Math.random() < hatchP) ? (Math.random()<0.5?'air':'ground') : null;
+        dropEggAt([12,69,31,88][i], t, hatch);
 
         // off-beat con swing
         const off = t + beat/2 + (PROF.SWING*beat);
-        hatClick(off,out,0.42);
-        dropEggAt([50,31,50,69][i], off, Math.random()<0.28 ? (Math.random()<0.5?'air':'ground') : null);
+        hatClick(off,out,0.40, false);
+        const hatch2 = (Math.random() < 0.22) ? (Math.random()<0.5?'air':'ground') : null;
+        dropEggAt([50,31,50,69][i], off, hatch2);
 
         // mini “aa”
         if (Math.random() < 0.85){
-          babyTherapyAA(off, out, { cluster:2, voices:2 });
+          babyTherapyAA(off, out, { cluster: fillOn?3:2, voices:2 });
         }
       }
+
+      // mini fill in coda ogni 4 misure
+      if (fillOn){
+        const t = start + 1.75;
+        snareCluck(t, out, false);
+        hatClick(t+0.10, out, 0.36, true);
+      }
+
+      measureCount++;
       return start + dur;
     }
 
-    // ---------- Transient punch ----------
+    // ---------- Transient punch & duck ----------
     function transientPunch(mult=1){
       const c=ac(); if (!master) return;
       const now=c.currentTime+0.001;
       try{
-        const base = IS_MOBILE ? 1.18 : 1.10;
+        const base = IS_MOBILE ? 1.10 : 1.06;
         master.gain.cancelScheduledValues(now);
         master.gain.setValueAtTime(base, now);
-        master.gain.linearRampToValueAtTime(base * (1.12*mult), now + 0.02);
+        master.gain.linearRampToValueAtTime(base * (1.10*mult), now + 0.02);
         master.gain.linearRampToValueAtTime(base, now + 0.12);
       }catch(e){}
     }
+    function gentleDuck(amount=0.86, hold=0.18){ // >>> NEW: side-chain lieve
+      const c=ac(); if (!master) return;
+      const base = IS_MOBILE ? 1.10 : 1.06;
+      const now=c.currentTime+0.001;
+      master.gain.cancelScheduledValues(now);
+      master.gain.setValueAtTime(base, now);
+      master.gain.linearRampToValueAtTime(base*amount, now+0.01);
+      master.gain.linearRampToValueAtTime(base, now+hold);
+    }
 
-    // ---------- LOOP SCHEDULER (rolling, drift-proof) ----------
+    // ---------- LOOP SCHEDULER ----------
     let isRunning = false;
     let schedTimer = null;
-    let timelineEnd = 0;  // fino a dove ho schedulato
-    let MEASURE = 0;
+    let timelineEnd = 0;
 
     function scheduleChunk(fromTime){
-      // pattern: 3s scream + 2s measure = 5s totale
-      const c = ac();
       const afterS = chickenScream3s(fromTime, master);
       scheduleMeasure(afterS+0.06, master);
       return fromTime + 5.0;
@@ -654,7 +670,6 @@
       const c = ac();
       const horizon = c.currentTime + PROF.LOOKAHEAD;
       while (timelineEnd < horizon){
-        // trigger visual progress bar per blocco
         stage.classList.add('playing');
         bar.style.animation='none'; bar.offsetHeight; bar.style.animation=null;
         timelineEnd = scheduleChunk(timelineEnd || (c.currentTime + 0.08));
@@ -664,17 +679,14 @@
     function startLoop(){
       ensureMaster(); initEggPool();
 
-      // reset stato
       isRunning = true;
       timelineEnd = 0;
-      MEASURE = 0;
+      measureCount = 0;
 
-      // (ri)attiva scheduler
       if (schedTimer) clearInterval(schedTimer);
       schedTimer = setInterval(schedulerTick, PROF.TICK_MS);
 
-      // punch e via
-      transientPunch(1.05);
+      transientPunch(1.04);
       bar.style.animation='none'; bar.offsetHeight; bar.style.animation=null;
 
       startBtn.style.display='none';
@@ -687,7 +699,6 @@
 
       if (schedTimer){ clearInterval(schedTimer); schedTimer = null; }
 
-      // fade out veloce del master (senza chiudere il context)
       const c = ac(); const now=c.currentTime;
       try{
         master.gain.cancelScheduledValues(now);
@@ -701,33 +712,37 @@
       stopBtn.style.display='none';
     }
 
-    // ---------- EGGSplosion (spammabile con coalescing) ----------
+    // ---------- EGGSplosion con cooldown anti-spam ----------
     let lastBurstAt = 0;
     let queuedBursts = 0;
+    let burstLocked = false;
+    const BURST_COOLDOWN_MS = 2700;   // >>> NEW: cooldown
 
     function doBurst(){
       const c=ensureMaster();
       initEggPool();
-      transientPunch(1.08);
+
+      // duck leggero per tenere pulito
+      gentleDuck(0.82, 0.32);
+      transientPunch(1.10);
 
       const base = c.currentTime + 0.02;
-      const waves = 3;                             // compatto, forte
-      const step  = IS_MOBILE ? 0.022 : 0.018;
-      const extra = Math.min(queuedBursts, 4);     // coalesce: più tap => più densità
+      const waves = 3;
+      const step  = IS_MOBILE ? 0.020 : 0.016;
+      const extra = Math.min(queuedBursts, 4);
       const eggsPer = PROF.EGGS_PER_WAVE + extra*4;
 
       for(let w=0; w<waves; w++){
         const wBase = base + w*0.34;
         for(let i=0;i<eggsPer;i++){
           const t = wBase + i*step;
-          const lane = LANES[Math.floor(Math.random()*LANES.length)];
-          const mode = (Math.random()<0.7?'air':'ground');
+          const lane = [12,31,50,69,88][(i+w*3)%5];
+          const mode = (Math.random()<0.72?'air':'ground');
           dropEggAt(lane, t, mode);
 
-          const headroom = Math.max(0, PROF.VOICE_BUDGET - VOICES_NOW);
-          if (headroom >= 6 && master){
-            // riduci cluster se sei tirato
-            const cl = headroom > 20 ? 3 : 2;
+          // suono chick solo se c'è headroom
+          if (headroom() >= 6 && master){
+            const cl = headroom() > 22 ? 3 : 2;
             babyTherapyAA(t+0.012, master, { cluster:cl, voices:2, pitch:1.55 + Math.random()*0.2 });
           }
         }
@@ -736,16 +751,27 @@
     }
 
     function triggerBurst(){
-      const now = performance.now();
-      // min spacing fra ondate (coalesce) — non blocca lo spam, lo accorpa
-      if (now - lastBurstAt < 90){
-        queuedBursts++;
-        return;
+      if (burstLocked) return;
+      burstLocked = true;
+
+      // UI lock con countdown
+      if (eggBtn){
+        eggBtn.disabled = true;
+        const txt = eggBtn.textContent;
+        let left = Math.ceil(BURST_COOLDOWN_MS/1000);
+        eggBtn.textContent = `🥚💥 EGGSplosion (${left})`;
+        const it = setInterval(()=>{
+          left--; eggBtn.textContent = `🥚💥 EGGSplosion (${left})`;
+          if (left<=0){ clearInterval(it); eggBtn.disabled=false; eggBtn.textContent = txt; }
+        }, 1000);
       }
+
+      const now = performance.now();
       lastBurstAt = now;
       queuedBursts++;
-      // esegui al prossimo frame per accorpare tap ravvicinati
       requestAnimationFrame(doBurst);
+
+      setTimeout(()=>{ burstLocked = false; }, BURST_COOLDOWN_MS);
     }
 
     // ---------- Buttons wiring ----------
@@ -754,7 +780,6 @@
       stopBtn .addEventListener('pointerdown', stopLoop,  {passive:true});
       eggBtn  .addEventListener('pointerdown', triggerBurst, {passive:true});
 
-      // pre-warm (solo unlock, non once su start/egg)
       startBtn.addEventListener('pointerdown', ensureMaster, {passive:true, once:true});
       eggBtn  .addEventListener('pointerdown', ensureMaster, {passive:true, once:true});
     }
@@ -762,6 +787,8 @@
   </script>
 </body>
 </html>
+
+
 
 
 
