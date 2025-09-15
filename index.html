@@ -219,574 +219,454 @@
     </div>
   </div>
 
-  <script>
-  // ===== AUDIO + VISUAL ENGINE (rev. stabile) =====
-  (function(){
-    const stage    = document.getElementById('stage');
-    const bar      = stage.querySelector('.bar');
-    const controls = document.getElementById('controls');
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn  = document.getElementById('stopBtn');
-    const eggBtn   = document.getElementById('eggBtn');
-    const chicken  = stage.querySelector('.chicken');
-    const crestEl  = stage.querySelector('.crest');
+ <script>
+/* ===== AUDIO + VISUAL ENGINE — sync-lock + mobile clean ===== */
+(function(){
+  const stage    = document.getElementById('stage');
+  const bar      = stage.querySelector('.bar');
+  const controls = document.getElementById('controls');
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn  = document.getElementById('stopBtn');
+  const eggBtn   = document.getElementById('eggBtn');
+  const chicken  = stage.querySelector('.chicken');
+  const crestEl  = stage.querySelector('.crest');
 
-    const IS_MOBILE = (('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0) ||
-                      (window.matchMedia && window.matchMedia('(pointer:coarse)').matches));
+  const IS_MOBILE = (('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0) ||
+                    (window.matchMedia && window.matchMedia('(pointer:coarse)').matches));
 
-    const PROF = IS_MOBILE ? {
-      LOOKAHEAD: 0.28,
-      TICK_MS:   35,
-      VOICE_BUDGET: 28,          // >>> FIX: leggermente più alto ma protetto
-      EGGS_PER_WAVE: 14,
-      EGG_POOL: 36,              // >>> FIX: pool più ampio
-      MINI_AA_COOLDOWN_MS: 70,
-      SWING: 0.03
-    } : {
-      LOOKAHEAD: 0.40,
-      TICK_MS:   22,
-      VOICE_BUDGET: 140,
-      EGGS_PER_WAVE: 26,
-      EGG_POOL: 72,
-      MINI_AA_COOLDOWN_MS: 34,
-      SWING: 0.04
-    };
+  /* -------- Profiles: desktop “brutale pulito” vs mobile “pulito massimo” -------- */
+  const PROF = IS_MOBILE ? {
+    LOOKAHEAD: 0.28,              // audio scheduler anticipo
+    TICK_MS:   30,                // frequenza scheduler
+    VOICE_BUDGET: 34,             // budget totale voci (mobile)
+    EGG_POOL: 56,                 // più ampio per non “sparire”
+    MINI_AA_COOLDOWN_MS: 80,
+    SWING: 0.03,
+    // EGGSplosion (mobile, più safe)
+    BURST_COOLDOWN_MS: 4500,      // ricarica più lunga per evitare sovrapposizioni
+    BURST_WAVES: 2,
+    BURST_STEP: 0.022,
+    BURST_EGGS_PER_WAVE: 14,
+  } : {
+    LOOKAHEAD: 0.42,
+    TICK_MS:   20,
+    VOICE_BUDGET: 180,
+    EGG_POOL: 72,
+    MINI_AA_COOLDOWN_MS: 34,
+    SWING: 0.04,
+    // EGGSplosion (desktop, ignorante ma pulito)
+    BURST_COOLDOWN_MS: 2400,
+    BURST_WAVES: 4,
+    BURST_STEP: 0.014,
+    BURST_EGGS_PER_WAVE: 28,
+  };
 
-    // Mostra controlli solo post-success
-    const url = new URL(location.href);
-    if (url.searchParams.get('success') === '1') {
-      controls.style.display = 'flex';
+  // mostra controlli post-pagamento
+  const url = new URL(location.href);
+  if (url.searchParams.get('success') === '1') controls.style.display = 'flex';
+  chicken.classList.add('breathe');
+
+  /* ---------------- Audio chain ---------------- */
+  let ctx=null, master, preSat, comp, postLP, softLim, NOISE_BUF=null;
+
+  function ac(){
+    if (!ctx || ctx.state === 'closed'){
+      ctx = new (window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
     }
+    return ctx;
+  }
 
-    chicken.classList.add('breathe');
+  // voice accounting corretto
+  let VOICES_NOW = 0;
+  const inc=()=>{ VOICES_NOW++; };
+  const dec=()=>{ VOICES_NOW = Math.max(0, VOICES_NOW-1); };
+  function track(node, fallbackMs=300){
+    inc();
+    const tidy=()=>{ node.removeEventListener?.('ended', tidy); dec(); };
+    try{ node.addEventListener?.('ended', tidy, {once:true}); }catch(e){}
+    setTimeout(tidy, fallbackMs+30);
+  }
+  const headroom = ()=> Math.max(0, PROF.VOICE_BUDGET - VOICES_NOW);
 
-    // ---------- Audio Context & Master ----------
-    let ctx = null;
-    let master, preSat, comp, hardLim;
-    let NOISE_BUF = null;
+  function mkWS(curveFn, n=4096){
+    const c=ac(); const curve=new Float32Array(n);
+    for (let i=0;i<n;i++){ const x=i/n*2-1; curve[i]=curveFn(x); }
+    const ws=c.createWaveShaper(); ws.curve=curve; ws.oversample='4x'; return ws;
+  }
 
-    function ac(){
-      if (!ctx || ctx.state === 'closed') {
-        ctx = new (window.AudioContext||window.webkitAudioContext)({ latencyHint:'interactive' });
-      }
-      return ctx;
-    }
+  function buildMaster(){
+    const c=ac();
+    master = c.createGain();
 
-    // >>> NEW: voice accounting corretto
-    let VOICES_NOW = 0;
-    function _inc(){ VOICES_NOW++; }
-    function _dec(){ VOICES_NOW = Math.max(0, VOICES_NOW-1); }
-    function trackNode(node, fallbackMs=300){
-      _inc();
-      const tidy = ()=>{ node.removeEventListener?.('ended', tidy); _dec(); };
-      try{ node.addEventListener?.('ended', tidy, {once:true}); }catch(e){}
-      // fallback se ended non arriva
-      setTimeout(tidy, fallbackMs+20);
-    }
-    function headroom(){ return Math.max(0, PROF.VOICE_BUDGET - VOICES_NOW); }
+    // Mobile: meno drive, più headroom. Desktop: più spinta ma morbida.
+    preSat = mkWS(x => Math.tanh((IS_MOBILE?7.5:9.5)*x));
+    comp   = c.createDynamicsCompressor();
+    comp.threshold.value = IS_MOBILE ? -14 : -12;
+    comp.knee.value      = IS_MOBILE ? 16  : 12;
+    comp.ratio.value     = IS_MOBILE ? 6   : 5;
+    comp.attack.value    = 0.004;
+    comp.release.value   = 0.12;
 
-    function mkWaveShaper(curveFn){
-      const c = ac();
-      const n = 4096, curve = new Float32Array(n); // >>> FIX: curva più fine
-      for (let i=0;i<n;i++){ const x = i/n*2-1; curve[i] = curveFn(x); }
-      const ws = c.createWaveShaper();
-      ws.curve = curve; ws.oversample = '4x';
-      return ws;
-    }
+    // Post low-pass per togliere fruscio aspro su mobile, lascia aria su desktop
+    postLP = c.createBiquadFilter();
+    postLP.type='lowpass';
+    postLP.frequency.value = IS_MOBILE ? 3800 : 5200;
+    postLP.Q.value = 0.5;
 
-    function buildMaster(){
-      const c = ac();
-      master = c.createGain();
-
-      // >>> FIX: saturazione più dolce per mix “pulito”
-      preSat = mkWaveShaper(x => Math.tanh((IS_MOBILE?10:8) * x));
-      comp   = c.createDynamicsCompressor();
-      comp.threshold.value = IS_MOBILE ? -8 : -12;
-      comp.knee.value = 12; comp.ratio.value = IS_MOBILE ? 10 : 6;
-      comp.attack.value = 0.003; comp.release.value = 0.12;
-
-      // soft-clipper
-      hardLim = mkWaveShaper(x => {
-        const k = 0.95; // soft
-        return Math.max(-k, Math.min(k, x));
-      });
-
-      master.connect(preSat).connect(comp).connect(hardLim).connect(c.destination);
-      const now = c.currentTime + 0.001;
-      master.gain.setValueAtTime(IS_MOBILE ? 1.10 : 1.06, now);
-
-      if (!NOISE_BUF){
-        NOISE_BUF = c.createBuffer(1, Math.floor(c.sampleRate * 1.0), c.sampleRate);
-        const d = NOISE_BUF.getChannelData(0);
-        for (let i=0;i<d.length;i++) d[i] = (Math.random()*2 - 1);
-      }
-    }
-
-    function ensureMaster(){
-      const c = ac();
-      if (!master) buildMaster();
-      if (master.context !== c) buildMaster();
-      if (c.state !== 'running' && c.resume) { try { c.resume(); } catch(e){} }
-      return c;
-    }
-
-    // --- Robust mobile unlock
-    function unlockOnce(){
-      const c = ensureMaster();
-      try {
-        const src = c.createBufferSource();
-        const b = c.createBuffer(1, 1, c.sampleRate);
-        src.buffer = b; src.connect(c.destination); src.start(0);
-        trackNode(src, 30);
-      } catch(e){}
-      document.removeEventListener('pointerdown', unlockOnce);
-      document.removeEventListener('touchstart', unlockOnce);
-    }
-    document.addEventListener('pointerdown', unlockOnce, {passive:true, once:true});
-    document.addEventListener('touchstart',  unlockOnce, {passive:true, once:true});
-
-    document.addEventListener('visibilitychange', () => {
-      const c = ctx; if (!c) return;
-      if (document.visibilityState === 'visible' && c.state !== 'running' && c.resume) {
-        try { c.resume(); } catch(e){}
-      }
+    // Soft limiter (clipper morbido)
+    softLim = mkWS(x => {
+      const k=0.92; return Math.max(-k, Math.min(k, x));
     });
 
-    // ---------- Visual helpers ----------
-    function setScream(on){
-      stage.classList.toggle('scream', !!on);
-      const shoutEl = stage.querySelector('.shout');
-      if (!shoutEl) return;
-      shoutEl.style.opacity = on ? '1' : '0';
-      shoutEl.style.transform='translateX(-50%)';
-    }
-    function pulseWing(){
-      stage.classList.add('beat');
-      setTimeout(()=>stage.classList.remove('beat'), 150);
-    }
-    function pumpChickenAt(when){
-      const c = ac();
-      const ms = Math.max(0, (when - c.currentTime) * 1000);
-      setTimeout(()=>{
-        chicken.classList.remove('pump'); void chicken.offsetWidth; chicken.classList.add('pump');
-        if (crestEl){ crestEl.classList.remove('bob'); void crestEl.offsetWidth; crestEl.classList.add('bob'); }
-      }, ms);
-    }
-    function thumpAt(when){
-      const c = ac();
-      const ms = Math.max(0, (when - c.currentTime) * 1000);
-      setTimeout(()=>{
-        stage.style.transform='scale(1.012)';
-        setTimeout(()=>{ stage.style.transform='scale(1)'; }, 90);
-      }, ms);
-    }
+    master.connect(preSat).connect(comp).connect(postLP).connect(softLim).connect(c.destination);
 
-    // ---------- Egg Pool ----------
-    const eggPool = [];
-    function initEggPool(){
-      if (eggPool.length) return;
-      for (let i=0;i<PROF.EGG_POOL;i++){
-        const e = document.createElement('span');
-        e.className='egg'; e.textContent='🥚'; e.style.display='none';
-        stage.appendChild(e); eggPool.push(e);
+    const now=c.currentTime+0.001;
+    master.gain.setValueAtTime(IS_MOBILE?1.00:1.06, now);
+
+    if (!NOISE_BUF){
+      NOISE_BUF = c.createBuffer(1, Math.floor(c.sampleRate*1.0), c.sampleRate);
+      const d = NOISE_BUF.getChannelData(0);
+      for (let i=0;i<d.length;i++) d[i]=(Math.random()*2-1);
+    }
+  }
+  function ensureMaster(){
+    const c=ac();
+    if (!master || master.context!==c) buildMaster();
+    if (c.state!=='running' && c.resume){ try{c.resume();}catch(e){} }
+    return c;
+  }
+  // mobile unlock
+  function unlockOnce(){
+    const c=ensureMaster();
+    try{
+      const src=c.createBufferSource(); src.buffer=c.createBuffer(1,1,c.sampleRate);
+      src.connect(c.destination); src.start(0); track(src, 20);
+    }catch(e){}
+    document.removeEventListener('pointerdown', unlockOnce);
+    document.removeEventListener('touchstart', unlockOnce);
+  }
+  document.addEventListener('pointerdown', unlockOnce, {passive:true, once:true});
+  document.addEventListener('touchstart',  unlockOnce, {passive:true, once:true});
+  document.addEventListener('visibilitychange', () => {
+    if (!ctx) return; if (document.visibilityState==='visible' && ctx.state!=='running') ctx.resume?.();
+  });
+
+  /* ---------------- VISUAL QUEUE (Audio-locked) ----------------
+     Tutte le animazioni visual vengono accodate con un time (ctx.currentTime).
+     Un loop RAF legge currentTime e spara gli eventi “due” → sync perfetto.  */
+  const vq = []; // {t, fn}
+  function at(t, fn){ vq.push({t, fn}); } // schedule visual @ audio time
+  function runVQ(){
+    const c=ac(); const now=c.currentTime;
+    // esegui max 32 per frame per non bloccare
+    let executed=0;
+    for (let i=vq.length-1; i>=0 && executed<32; i--){
+      if (vq[i].t <= now){
+        const ev=vq.splice(i,1)[0]; try{ ev.fn(); }catch(e){}
+        executed++;
       }
     }
-    function getEggEl(){
-      for (const e of eggPool){ if (e.style.display==='none'){ e.style.display=''; return e; } }
-      // riuso il primo, ma resetta anim
-      const e = eggPool[0]; e.style.display=''; return e;
+    requestAnimationFrame(runVQ);
+  }
+  requestAnimationFrame(runVQ);
+
+  /* ---------------- Visual helpers (agganciati a VQ) ---------------- */
+  function setScream(on){
+    stage.classList.toggle('scream', !!on);
+    const shoutEl = stage.querySelector('.shout');
+    if (shoutEl){ shoutEl.style.opacity = on ? '1' : '0'; shoutEl.style.transform='translateX(-50%)'; }
+  }
+  function pulseWingAt(t){ at(t, ()=>{ stage.classList.add('beat'); setTimeout(()=>stage.classList.remove('beat'), 150); }); }
+  function pumpChickenAt(t){ at(t, ()=>{ chicken.classList.remove('pump'); void chicken.offsetWidth; chicken.classList.add('pump'); crestEl?.classList.remove('bob'); void crestEl?.offsetWidth; crestEl?.classList.add('bob'); }); }
+  function thumpAt(t){ at(t, ()=>{ stage.style.transform='scale(1.012)'; setTimeout(()=>stage.style.transform='scale(1)', 90); }); }
+
+  /* ---------------- Egg pool ---------------- */
+  const eggPool=[];
+  function initEggPool(){
+    if (eggPool.length) return;
+    for (let i=0;i<PROF.EGG_POOL;i++){
+      const e=document.createElement('span');
+      e.className='egg'; e.textContent='🥚'; e.style.display='none';
+      stage.appendChild(e); eggPool.push(e);
     }
-    function releaseEggEl(e){ e.style.display='none'; e.textContent='🥚'; e.style.animation='none'; void e.offsetWidth; }
+  }
+  function getEgg(){
+    for (const e of eggPool) if (e.style.display==='none'){ e.style.display=''; return e; }
+    // Se tutte occupate, droppa visual meno importanti su mobile per restare fluidi
+    if (IS_MOBILE) return null;
+    const e=eggPool[0]; e.style.display=''; return e;
+  }
+  function releaseEgg(e){ if(!e) return; e.style.display='none'; e.textContent='🥚'; e.style.animation='none'; void e.offsetWidth; }
 
-    // Mini "aa" (light throttle)
-    let lastAATime = 0;
-    function spawnMiniAAnearEl(el){
-      const now = performance.now();
-      if (now - lastAATime < PROF.MINI_AA_COOLDOWN_MS) return;
-      lastAATime = now;
-      const aa = document.createElement('span');
-      aa.className='miniAA'; aa.textContent='aa';
-      const r = el.getBoundingClientRect(), rs=stage.getBoundingClientRect();
-      aa.style.left = (r.left - rs.left + 18) + 'px';
-      aa.style.top  = (r.top  - rs.top  - 12) + 'px';
-      stage.appendChild(aa);
-      aa.style.animation='aaPop .24s ease-out forwards';
-      setTimeout(()=>aa.remove(), 260);
-    }
+  let lastAATime=0;
+  function miniAAnear(e){
+    if(!e) return;
+    const now=performance.now(); if (now-lastAATime<PROF.MINI_AA_COOLDOWN_MS) return;
+    lastAATime=now;
+    const aa=document.createElement('span'); aa.className='miniAA'; aa.textContent='aa';
+    const r=e.getBoundingClientRect(), rs=stage.getBoundingClientRect();
+    aa.style.left = (r.left-rs.left+18)+'px';
+    aa.style.top  = (r.top -rs.top -12)+'px';
+    stage.appendChild(aa); aa.style.animation='aaPop .24s ease-out forwards';
+    setTimeout(()=>aa.remove(), 260);
+  }
 
-    // ---------- Audio building blocks ----------
-    function hatClick(t, out, gain=0.42, open=false){
-      const c = ac();
-      const src = c.createBufferSource();
-      src.buffer = NOISE_BUF;
-      const hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value= open ? 3000 : 5000;
-      const g = c.createGain();
-      const len = open ? 0.14 : 0.06;
-      g.gain.setValueAtTime(gain, t);
-      g.gain.exponentialRampToValueAtTime(0.0001, t+len);
-      src.connect(hp).connect(g).connect(out);
-      src.start(t);
-      src.stop(t+len+0.005);
-      trackNode(src, (len*1000)|0);
-    }
+  /* ---------------- Drum & Voices ---------------- */
+  function hat(t, out, gain=0.42, open=false){
+    const c=ac();
+    const src=c.createBufferSource(); src.buffer=NOISE_BUF;
+    const hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=open?3000:5000;
+    const g=c.createGain(); const len=open?0.14:0.06;
+    g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t+len);
+    src.connect(hp).connect(g).connect(out); src.start(t); src.stop(t+len+0.005); track(src, len*1000);
+  }
+  function kick(t, out){
+    const c=ac(); const o=c.createOscillator(); o.type='sine';
+    const g=c.createGain(); o.frequency.setValueAtTime(140,t); o.frequency.exponentialRampToValueAtTime(55,t+0.16);
+    g.gain.setValueAtTime(1.0,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);
+    o.connect(g).connect(out); o.start(t); o.stop(t+0.19); track(o, 190);
+  }
+  function snare(t, out, ghost=false){
+    const c=ac(); const o=c.createOscillator(); o.type='square';
+    const g=c.createGain(); o.frequency.setValueAtTime(ghost?680:760,t); o.frequency.exponentialRampToValueAtTime(300,t+0.07);
+    g.gain.setValueAtTime(ghost?0.45:0.95,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.10);
+    o.connect(g).connect(out); o.start(t); o.stop(t+0.11); track(o, 120);
+  }
+  function mkDist(amt=IS_MOBILE?14:18){ return mkWS(x=>Math.tanh(amt*x)); }
 
-    function kickPlop(t, out){
-      const c = ac();
-      const o=c.createOscillator(); o.type='sine';
-      const g=c.createGain();
-      o.frequency.setValueAtTime(140,t);
-      o.frequency.exponentialRampToValueAtTime(55,t+0.16);
-      g.gain.setValueAtTime(1.0,t);
-      g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);
-      o.connect(g).connect(out); o.start(t); o.stop(t+0.19);
-      trackNode(o, 190);
-    }
-    function snareCluck(t, out, ghost=false){
-      const c = ac();
-      const o=c.createOscillator(); o.type='square';
-      const g=c.createGain();
-      o.frequency.setValueAtTime(ghost? 680:750,t);
-      o.frequency.exponentialRampToValueAtTime(300,t+0.07);
-      g.gain.setValueAtTime(ghost? 0.45:0.95,t);
-      g.gain.exponentialRampToValueAtTime(0.0001,t+0.10);
-      o.connect(g).connect(out); o.start(t); o.stop(t+0.11);
-      trackNode(o, 120);
-    }
+  function babyAA(t, out, {
+    len=IS_MOBILE?0.28:0.32, pitch=1.6, gain=IS_MOBILE?0.50:0.58, detCents=10, tremHz=IS_MOBILE?12:14,
+    distAmt=IS_MOBILE?12:16, voices=IS_MOBILE?1:2, cluster=IS_MOBILE?1:2, clusterGap=0.035
+  }={}){
+    if (headroom()<3){ voices=1; cluster=1; gain*=0.6; len*=0.7; }
+    const c=ac();
+    for (let k=0;k<cluster;k++){
+      const tt=t+k*clusterGap;
+      const bus=c.createGain(); bus.gain.setValueAtTime(0.0001,tt);
+      bus.gain.exponentialRampToValueAtTime(gain,tt+0.02);
+      bus.gain.exponentialRampToValueAtTime(0.0001,tt+len);
 
-    function mkDist(amt=16){ return mkWaveShaper(x=>Math.tanh(amt*x)); } // >>> leggermente meno
+      const dist=mkDist(distAmt), bp=c.createBiquadFilter(), lp=c.createBiquadFilter();
+      bp.type='bandpass'; bp.frequency.value=IS_MOBILE?1900:2100; bp.Q.value=4.5;
+      lp.type='lowpass';  lp.frequency.value=IS_MOBILE?3200:3600;
 
-    function babyTherapyAA(t, out, {
-      len=0.32, pitch=1.6, gain=0.56, detCents=10, tremHz=14, distAmt=16, voices=2, cluster=2, clusterGap=0.035
-    } = {}){
-      let hr = headroom();
-      if (hr < 4) { voices = 1; cluster = 1; gain *= 0.6; len *= 0.7; }
+      const sum=c.createGain(); sum.connect(dist).connect(bp).connect(lp).connect(bus).connect(out);
 
-      const c = ac();
-      for (let k=0;k<cluster;k++){
-        const tt = t + k*clusterGap;
-
-        const bus=c.createGain(); bus.gain.setValueAtTime(0.0001,tt);
-        bus.gain.exponentialRampToValueAtTime(gain,tt+0.02);
-        bus.gain.exponentialRampToValueAtTime(0.0001,tt+len);
-
-        const dist=mkDist(distAmt), bp=c.createBiquadFilter(), lp=c.createBiquadFilter();
-        bp.type='bandpass'; bp.frequency.value=2000; bp.Q.value=5;
-        lp.type='lowpass';  lp.frequency.value=3300;
-        const sum=c.createGain(); sum.connect(dist).connect(bp).connect(lp).connect(bus).connect(out);
-
-        for(let v=0; v<voices; v++){
-          if (headroom() <= 0) break;
-          const o=c.createOscillator(); o.type='sawtooth';
-          const g=c.createGain();
-          const f0=620*pitch;
-          o.frequency.setValueAtTime(f0,tt);
-          o.detune.setValueAtTime(v===0?-detCents:+detCents,tt);
-          o.frequency.linearRampToValueAtTime(f0*1.16, tt+0.05);
-          o.frequency.exponentialRampToValueAtTime(f0*0.26, tt+len*0.85);
-          g.gain.setValueAtTime(0.0001,tt);
-          g.gain.exponentialRampToValueAtTime(0.95,tt+0.035);
-          g.gain.exponentialRampToValueAtTime(0.0001,tt+len);
-
-          const trem=c.createOscillator(); trem.frequency.value=tremHz;
-          const tremAmt=c.createGain(); tremAmt.gain.value=0.7;
-          trem.connect(tremAmt.gain); g.connect(tremAmt);
-          o.connect(g).connect(sum);
-          trem.start(tt); trem.stop(tt+len);
-          o.start(tt); o.stop(tt+len);
-          trackNode(o, (len*1000)|0);
-        }
-
-        // noise layer
-        if (headroom() > 0){
-          const n=c.createBufferSource(); n.buffer=NOISE_BUF;
-          const nBP=c.createBiquadFilter(); nBP.type='bandpass'; nBP.frequency.value=2400; nBP.Q.value=6;
-          const ng=c.createGain(); ng.gain.setValueAtTime(0.001, tt+0.03);
-          ng.gain.exponentialRampToValueAtTime(0.24, tt+0.08);
-          ng.gain.exponentialRampToValueAtTime(0.0001, tt+len);
-          n.connect(nBP).connect(ng).connect(sum);
-          n.start(tt); n.stop(tt+len);
-          trackNode(n, (len*1000)|0);
-        }
-      }
-    }
-
-    // ---------- Visual eggs ----------
-    function dropEggAt(lanePct, at, hatchMode){
-      const c=ac(); const ms=Math.max(0,(at - c.currentTime)*1000);
-      setTimeout(()=>{
-        const e=getEggEl();
-        const size=30 + Math.round(Math.random()*8);
-        e.style.fontSize = size+'px';
-        e.style.left = `calc(${lanePct}% - ${size/2}px)`;
-        e.style.setProperty('--x', (Math.random()*8 - 4) + 'px');
-        e.style.animation='none'; void e.offsetWidth;
-        e.style.animation='fall 1.12s linear forwards';
-
-        if (hatchMode){
-          const when = (hatchMode==='air') ? 0.48 : 1.08;
-          setTimeout(()=>{ e.textContent='🐣'; spawnMiniAAnearEl(e); }, when*1000);
-          if (master) babyTherapyAA(c.currentTime + Math.max(0, (ms/1000) + when - 0.01), master, { cluster:2, voices:2, pitch:1.55 + (hatchMode==='air'?0.1:0) });
-        }
-
-        setTimeout(()=>releaseEggEl(e), 1500);
-      }, ms);
-    }
-
-    // ---------- Scream (3s) ----------
-    function chickenScream3s(t, out){
-      const c = ac();
-      setScream(true);
-      const len=3.0;
-      const bus=c.createGain(); bus.gain.value=1.0;
-      const dist=mkDist(18);
-      const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1800; bp.Q.value=4.5;
-      const lp=c.createBiquadFilter(); lp.type='lowpass';  lp.frequency.value=2800;
-      bus.connect(dist).connect(bp).connect(lp).connect(out);
-
-      [-10,+10].forEach(det=>{
+      for (let v=0; v<voices; v++){
+        if (headroom()<=0) break;
         const o=c.createOscillator(); o.type='sawtooth';
-        const g=c.createGain();
-        o.frequency.setValueAtTime(620,t);
-        o.detune.setValueAtTime(det,t);
-        o.frequency.linearRampToValueAtTime(720, t+0.12);
-        o.frequency.exponentialRampToValueAtTime(150, t+len*0.92);
-        g.gain.setValueAtTime(0.0001,t);
-        g.gain.exponentialRampToValueAtTime(0.92,t+0.06);
-        g.gain.exponentialRampToValueAtTime(0.0001,t+len);
-
-        const trem=c.createOscillator(); trem.frequency.value=13;
-        const tremAmt=c.createGain(); tremAmt.gain.value=0.7;
-        trem.connect(tremAmt.gain); g.connect(tremAmt);
-        o.connect(g).connect(bus);
-        trem.start(t); trem.stop(t+len);
-        o.start(t); o.stop(t+len);
-        trackNode(o, (len*1000)|0);
-      });
+        const g=c.createGain(); const f0=620*pitch;
+        o.frequency.setValueAtTime(f0,tt);
+        o.detune.setValueAtTime(v===0?-detCents:+detCents,tt);
+        o.frequency.linearRampToValueAtTime(f0*1.14, tt+0.05);
+        o.frequency.exponentialRampToValueAtTime(f0*0.28, tt+len*0.85);
+        g.gain.setValueAtTime(0.0001,tt);
+        g.gain.exponentialRampToValueAtTime(0.92,tt+0.035);
+        g.gain.exponentialRampToValueAtTime(0.0001,tt+len);
+        const trem=c.createOscillator(); trem.frequency.value=tremHz;
+        const tremAmt=c.createGain(); trem.connect(tremAmt.gain); g.connect(tremAmt);
+        o.connect(g).connect(sum); trem.start(tt); trem.stop(tt+len); o.start(tt); o.stop(tt+len);
+        track(o, len*1000);
+      }
 
       // noise layer
-      const n=c.createBufferSource(); n.buffer=NOISE_BUF;
-      const nBP=c.createBiquadFilter(); nBP.type='bandpass'; nBP.frequency.value=2600; nBP.Q.value=6;
-      const ng=c.createGain(); ng.gain.setValueAtTime(0.05, t+0.08);
-      ng.gain.exponentialRampToValueAtTime(0.5, t+0.22);
-      ng.gain.exponentialRampToValueAtTime(0.0001, t+len);
-      n.connect(nBP).connect(ng).connect(bus);
-      n.start(t); n.stop(t+len);
-      trackNode(n, (len*1000)|0);
-
-      // tick + uova leggere
-      for (let x=t+0.10; x < t+len-0.06; x += 0.25){
-        hatClick(x, out, 0.18, false);
-        const lane = (Math.round((x - t)/0.25) % 2) ? 31 : 50;
-        dropEggAt(lane, x, null);
-      }
-
-      setTimeout(()=>setScream(false), (len*1000)+60);
-      return t+len;
-    }
-
-    // ---------- Groove con variazioni ----------
-    let measureCount = 0;
-    function scheduleMeasure(start, out){
-      const dur=2.0, beat=0.5;
-
-      // >>> NEW: varietà
-      const ghostOn = (measureCount % 2===1) && Math.random()<0.7;
-      const openHatOn = Math.random()<0.3;
-      const fillOn = (measureCount % 4===3);
-
-      for(let i=0;i<4;i++){
-        const t = start + i*beat;
-
-        pulseWing();
-        pumpChickenAt(t);
-        if (i===0 || i===2){ kickPlop(t,out); thumpAt(t); } else { snareCluck(t,out, ghostOn && i===3); }
-
-        // quarti
-        hatClick(t,out,0.42, openHatOn && i===3);
-
-        // schiusa probabilistica per step
-        const hatchP = [0.15, 0.25, 0.18, 0.3][i] + (fillOn? 0.08:0);
-        const hatch = (Math.random() < hatchP) ? (Math.random()<0.5?'air':'ground') : null;
-        dropEggAt([12,69,31,88][i], t, hatch);
-
-        // off-beat con swing
-        const off = t + beat/2 + (PROF.SWING*beat);
-        hatClick(off,out,0.40, false);
-        const hatch2 = (Math.random() < 0.22) ? (Math.random()<0.5?'air':'ground') : null;
-        dropEggAt([50,31,50,69][i], off, hatch2);
-
-        // mini “aa”
-        if (Math.random() < 0.85){
-          babyTherapyAA(off, out, { cluster: fillOn?3:2, voices:2 });
-        }
-      }
-
-      // mini fill in coda ogni 4 misure
-      if (fillOn){
-        const t = start + 1.75;
-        snareCluck(t, out, false);
-        hatClick(t+0.10, out, 0.36, true);
-      }
-
-      measureCount++;
-      return start + dur;
-    }
-
-    // ---------- Transient punch & duck ----------
-    function transientPunch(mult=1){
-      const c=ac(); if (!master) return;
-      const now=c.currentTime+0.001;
-      try{
-        const base = IS_MOBILE ? 1.10 : 1.06;
-        master.gain.cancelScheduledValues(now);
-        master.gain.setValueAtTime(base, now);
-        master.gain.linearRampToValueAtTime(base * (1.10*mult), now + 0.02);
-        master.gain.linearRampToValueAtTime(base, now + 0.12);
-      }catch(e){}
-    }
-    function gentleDuck(amount=0.86, hold=0.18){ // >>> NEW: side-chain lieve
-      const c=ac(); if (!master) return;
-      const base = IS_MOBILE ? 1.10 : 1.06;
-      const now=c.currentTime+0.001;
-      master.gain.cancelScheduledValues(now);
-      master.gain.setValueAtTime(base, now);
-      master.gain.linearRampToValueAtTime(base*amount, now+0.01);
-      master.gain.linearRampToValueAtTime(base, now+hold);
-    }
-
-    // ---------- LOOP SCHEDULER ----------
-    let isRunning = false;
-    let schedTimer = null;
-    let timelineEnd = 0;
-
-    function scheduleChunk(fromTime){
-      const afterS = chickenScream3s(fromTime, master);
-      scheduleMeasure(afterS+0.06, master);
-      return fromTime + 5.0;
-    }
-
-    function schedulerTick(){
-      if (!isRunning) return;
-      const c = ac();
-      const horizon = c.currentTime + PROF.LOOKAHEAD;
-      while (timelineEnd < horizon){
-        stage.classList.add('playing');
-        bar.style.animation='none'; bar.offsetHeight; bar.style.animation=null;
-        timelineEnd = scheduleChunk(timelineEnd || (c.currentTime + 0.08));
+      if (headroom()>0){
+        const n=c.createBufferSource(); n.buffer=NOISE_BUF;
+        const nBP=c.createBiquadFilter(); nBP.type='bandpass'; nBP.frequency.value=2300; nBP.Q.value=6;
+        const ng=c.createGain(); ng.gain.setValueAtTime(0.001, tt+0.03);
+        ng.gain.exponentialRampToValueAtTime(0.22, tt+0.08);
+        ng.gain.exponentialRampToValueAtTime(0.0001, tt+len);
+        n.connect(nBP).connect(ng).connect(sum); n.start(tt); n.stop(tt+len); track(n, len*1000);
       }
     }
+  }
 
-    function startLoop(){
-      ensureMaster(); initEggPool();
+  /* ---------------- Eggs visual, audio-locked ---------------- */
+  const LANES=[12,31,50,69,88];
+  function scheduleEgg(lanePct, t, hatchMode){ // t in audio time
+    at(t, ()=>{
+      const e=getEgg(); if(!e) return; // su mobile, se saturo, salta
+      const size=30+Math.round(Math.random()*8);
+      e.style.fontSize=size+'px'; e.style.left=`calc(${lanePct}% - ${size/2}px)`;
+      e.style.setProperty('--x', (Math.random()*8-4)+'px');
+      e.style.animation='none'; void e.offsetWidth; e.style.animation='fall 1.12s linear forwards';
+      if (hatchMode){
+        const delay = (hatchMode==='air')?0.48:1.08;
+        at(ac().currentTime + delay, ()=>{
+          e.textContent='🐣'; miniAAnear(e);
+          babyAA(ac().currentTime+0.005, master, {cluster:IS_MOBILE?1:2, voices:IS_MOBILE?1:2, pitch:(hatchMode==='air'?1.65:1.55)});
+        });
+      }
+      setTimeout(()=>releaseEgg(e), 1500);
+    });
+  }
 
-      isRunning = true;
-      timelineEnd = 0;
-      measureCount = 0;
+  /* ---------------- Scream main (3s) ---------------- */
+  function scream3s(t, out){
+    const c=ac(); const len=3.0;
+    at(t, ()=>setScream(true));
+    const bus=c.createGain(); const dist=mkDist(IS_MOBILE?14:18);
+    const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1800; bp.Q.value=4.5;
+    const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=IS_MOBILE?2700:3000;
+    bus.connect(dist).connect(bp).connect(lp).connect(out);
 
-      if (schedTimer) clearInterval(schedTimer);
-      schedTimer = setInterval(schedulerTick, PROF.TICK_MS);
+    [-10,+10].forEach(det=>{
+      const o=c.createOscillator(); o.type='sawtooth';
+      const g=c.createGain(); o.frequency.setValueAtTime(620,t); o.detune.setValueAtTime(det,t);
+      o.frequency.linearRampToValueAtTime(720,t+0.12); o.frequency.exponentialRampToValueAtTime(160,t+len*0.92);
+      g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.90,t+0.06); g.gain.exponentialRampToValueAtTime(0.0001,t+len);
+      const trem=c.createOscillator(); trem.frequency.value=IS_MOBILE?12:13;
+      const tremAmt=c.createGain(); trem.connect(tremAmt.gain); g.connect(tremAmt);
+      o.connect(g).connect(bus); trem.start(t); trem.stop(t+len); o.start(t); o.stop(t+len); track(o, len*1000);
+    });
 
-      transientPunch(1.04);
+    const n=c.createBufferSource(); n.buffer=NOISE_BUF;
+    const nBP=c.createBiquadFilter(); nBP.type='bandpass'; nBP.frequency.value=IS_MOBILE?2400:2600; nBP.Q.value=6;
+    const ng=c.createGain(); ng.gain.setValueAtTime(0.04,t+0.08); ng.gain.exponentialRampToValueAtTime(0.45,t+0.22); ng.gain.exponentialRampToValueAtTime(0.0001,t+len);
+    n.connect(nBP).connect(ng).connect(bus); n.start(t); n.stop(t+len); track(n, len*1000);
+
+    for (let x=t+0.10; x<t+len-0.06; x+=0.25){
+      hat(x,out,0.18,false);
+      const lane = (Math.round((x - t)/0.25) % 2) ? 31 : 50;
+      scheduleEgg(lane, x, null);
+    }
+    at(t+len+0.06, ()=>setScream(false));
+    return t+len;
+  }
+
+  /* ---------------- Beat (2s) con variazioni leggere ---------------- */
+  let measureIdx=0;
+  function scheduleMeasure(start,out){
+    const dur=2.0, beat=0.5;
+    const ghostOn = (measureIdx%2===1) && Math.random()<0.6;
+    const openHatOn = Math.random()<0.25;
+    const fillOn = (measureIdx%4===3);
+
+    for (let i=0;i<4;i++){
+      const t = start + i*beat;
+      pulseWingAt(t); pumpChickenAt(t);
+      if (i===0 || i===2){ kick(t,out); thumpAt(t); } else { snare(t,out, ghostOn && i===3); }
+      hat(t,out,0.40, openHatOn && i===3);
+
+      const hatchP = [0.14,0.24,0.16,0.28][i] + (fillOn?0.06:0);
+      const hatch = (Math.random()<hatchP) ? (Math.random()<0.5?'air':'ground') : null;
+      scheduleEgg([12,69,31,88][i], t, hatch);
+
+      const off = t + beat/2 + (PROF.SWING*beat);
+      hat(off,out,0.38,false);
+      const hatch2 = (Math.random()<0.20) ? (Math.random()<0.5?'air':'ground') : null;
+      scheduleEgg([50,31,50,69][i], off, hatch2);
+
+      // mini AA legati all’off-beat (audio-locked)
+      if (Math.random()<0.82) babyAA(off, out, {cluster: fillOn? (IS_MOBILE?1:3):(IS_MOBILE?1:2)});
+    }
+    if (fillOn){ const t=start+1.75; snare(t,out,false); hat(t+0.10,out,0.34,true); }
+    measureIdx++; return start+dur;
+  }
+
+  /* ---------------- Transient & Duck ---------------- */
+  function transient(mult=1){
+    const c=ac(); if(!master) return; const base=IS_MOBILE?1.00:1.06; const now=c.currentTime+0.001;
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(base, now);
+    master.gain.linearRampToValueAtTime(base*(1.08*mult), now+0.02);
+    master.gain.linearRampToValueAtTime(base, now+0.12);
+  }
+  function duck(amount=0.86, hold=0.22){
+    const c=ac(); if(!master) return; const base=IS_MOBILE?1.00:1.06; const now=c.currentTime+0.001;
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(base, now);
+    master.gain.linearRampToValueAtTime(base*amount, now+0.01);
+    master.gain.linearRampToValueAtTime(base, now+hold);
+  }
+
+  /* ---------------- Loop scheduler ---------------- */
+  let isRunning=false, schedTimer=null, timelineEnd=0;
+  function chunk(from){
+    const after = scream3s(from, master);
+    scheduleMeasure(after+0.06, master);
+    return from+5.0;
+  }
+  function tick(){
+    if (!isRunning) return;
+    const c=ac(); const horizon=c.currentTime + PROF.LOOKAHEAD;
+    while (timelineEnd < horizon){
+      stage.classList.add('playing');
       bar.style.animation='none'; bar.offsetHeight; bar.style.animation=null;
-
-      startBtn.style.display='none';
-      stopBtn.style.display='inline-block';
+      timelineEnd = chunk(timelineEnd || (c.currentTime+0.08));
     }
+  }
+  function startLoop(){
+    ensureMaster(); initEggPool(); isRunning=true; timelineEnd=0; measureIdx=0;
+    if (schedTimer) clearInterval(schedTimer);
+    schedTimer=setInterval(tick, PROF.TICK_MS);
+    transient(1.03);
+    bar.style.animation='none'; bar.offsetHeight; bar.style.animation=null;
+    startBtn.style.display='none'; stopBtn.style.display='inline-block';
+  }
+  function stopLoop(){
+    if (!isRunning) return; isRunning=false;
+    if (schedTimer){ clearInterval(schedTimer); schedTimer=null; }
+    const c=ac(); const now=c.currentTime;
+    try{ master.gain.cancelScheduledValues(now); master.gain.setValueAtTime(master.gain.value, now); master.gain.linearRampToValueAtTime(0.0001, now+0.10); }catch(e){}
+    stage.classList.remove('playing'); setScream(false);
+    startBtn.style.display='inline-block'; stopBtn.style.display='none';
+  }
 
-    function stopLoop(){
-      if (!isRunning) return;
-      isRunning = false;
+  /* ---------------- EGGSplosion (desktop brutale, mobile safe) ---------------- */
+  let burstLocked=false, queuedBursts=0;
+  function burst(){
+    const c=ensureMaster(); initEggPool();
+    duck(IS_MOBILE?0.84:0.80, IS_MOBILE?0.26:0.34);
+    transient(1.12);
 
-      if (schedTimer){ clearInterval(schedTimer); schedTimer = null; }
+    const base=c.currentTime+0.02;
+    const waves=PROF.BURST_WAVES, step=PROF.BURST_STEP;
+    const eggsPer = PROF.BURST_EGGS_PER_WAVE + Math.min(queuedBursts,4)* (IS_MOBILE?3:5);
 
-      const c = ac(); const now=c.currentTime;
-      try{
-        master.gain.cancelScheduledValues(now);
-        master.gain.setValueAtTime(master.gain.value, now);
-        master.gain.linearRampToValueAtTime(0.0001, now + 0.10);
-      }catch(e){}
-
-      stage.classList.remove('playing'); setScream(false);
-
-      startBtn.style.display='inline-block';
-      stopBtn.style.display='none';
-    }
-
-    // ---------- EGGSplosion con cooldown anti-spam ----------
-    let lastBurstAt = 0;
-    let queuedBursts = 0;
-    let burstLocked = false;
-    const BURST_COOLDOWN_MS = 2700;   // >>> NEW: cooldown
-
-    function doBurst(){
-      const c=ensureMaster();
-      initEggPool();
-
-      // duck leggero per tenere pulito
-      gentleDuck(0.82, 0.32);
-      transientPunch(1.10);
-
-      const base = c.currentTime + 0.02;
-      const waves = 3;
-      const step  = IS_MOBILE ? 0.020 : 0.016;
-      const extra = Math.min(queuedBursts, 4);
-      const eggsPer = PROF.EGGS_PER_WAVE + extra*4;
-
-      for(let w=0; w<waves; w++){
-        const wBase = base + w*0.34;
-        for(let i=0;i<eggsPer;i++){
-          const t = wBase + i*step;
-          const lane = [12,31,50,69,88][(i+w*3)%5];
-          const mode = (Math.random()<0.72?'air':'ground');
-          dropEggAt(lane, t, mode);
-
-          // suono chick solo se c'è headroom
-          if (headroom() >= 6 && master){
-            const cl = headroom() > 22 ? 3 : 2;
-            babyTherapyAA(t+0.012, master, { cluster:cl, voices:2, pitch:1.55 + Math.random()*0.2 });
-          }
+    for (let w=0; w<waves; w++){
+      const wBase = base + w*0.32;
+      for (let i=0;i<eggsPer;i++){
+        const t = wBase + i*step;
+        const lane = LANES[(i+w*3)%LANES.length];
+        const mode = (Math.random()<0.74?'air':'ground');
+        scheduleEgg(lane, t, mode);
+        if (headroom() >= (IS_MOBILE?5:8)){
+          const cl = headroom() > (IS_MOBILE?18:24) ? (IS_MOBILE?1:3) : 2;
+          babyAA(t+0.010, master, {cluster:cl, voices:IS_MOBILE?1:2, pitch:1.55 + Math.random()*0.2});
         }
       }
-      queuedBursts = 0;
     }
-
-    function triggerBurst(){
-      if (burstLocked) return;
-      burstLocked = true;
-
-      // UI lock con countdown
-      if (eggBtn){
-        eggBtn.disabled = true;
-        const txt = eggBtn.textContent;
-        let left = Math.ceil(BURST_COOLDOWN_MS/1000);
-        eggBtn.textContent = `🥚💥 EGGSplosion (${left})`;
-        const it = setInterval(()=>{
-          left--; eggBtn.textContent = `🥚💥 EGGSplosion (${left})`;
-          if (left<=0){ clearInterval(it); eggBtn.disabled=false; eggBtn.textContent = txt; }
-        }, 1000);
-      }
-
-      const now = performance.now();
-      lastBurstAt = now;
-      queuedBursts++;
-      requestAnimationFrame(doBurst);
-
-      setTimeout(()=>{ burstLocked = false; }, BURST_COOLDOWN_MS);
+    queuedBursts=0;
+  }
+  function triggerBurst(){
+    if (burstLocked) return;
+    burstLocked=true;
+    // UI countdown
+    if (eggBtn){
+      eggBtn.disabled=true;
+      const txt=eggBtn.textContent; let left=Math.ceil(PROF.BURST_COOLDOWN_MS/1000);
+      eggBtn.textContent=`🥚💥 EGGSplosion (${left})`;
+      const it=setInterval(()=>{ left--; eggBtn.textContent=`🥚💥 EGGSplosion (${left})`; if(left<=0){ clearInterval(it); eggBtn.disabled=false; eggBtn.textContent=txt; }},1000);
     }
+    queuedBursts++; requestAnimationFrame(burst);
+    setTimeout(()=>{ burstLocked=false; }, PROF.BURST_COOLDOWN_MS);
+  }
 
-    // ---------- Buttons wiring ----------
-    if (startBtn){
-      startBtn.addEventListener('pointerdown', startLoop, {passive:true});
-      stopBtn .addEventListener('pointerdown', stopLoop,  {passive:true});
-      eggBtn  .addEventListener('pointerdown', triggerBurst, {passive:true});
+  /* ---------------- Wire buttons ---------------- */
+  if (startBtn){
+    startBtn.addEventListener('pointerdown', startLoop, {passive:true});
+    stopBtn .addEventListener('pointerdown',  stopLoop, {passive:true});
+    eggBtn  .addEventListener('pointerdown',  triggerBurst, {passive:true});
+    startBtn.addEventListener('pointerdown', ensureMaster, {passive:true, once:true});
+    eggBtn  .addEventListener('pointerdown', ensureMaster, {passive:true, once:true});
+  }
+})();
+</script>
 
-      startBtn.addEventListener('pointerdown', ensureMaster, {passive:true, once:true});
-      eggBtn  .addEventListener('pointerdown', ensureMaster, {passive:true, once:true});
-    }
-  })();
-  </script>
 </body>
 </html>
+
 
 
 
