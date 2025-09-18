@@ -156,13 +156,19 @@
       background:#f3f3f3; text-decoration:none; color:#111; font-weight:900;
     }
 
-    /* >>> NEW: stato disabled per il bottone EGGSplosion */
-    .btn[disabled]{
-      opacity:.55; cursor:not-allowed; filter:grayscale(.3);
+    .btn[disabled]{ opacity:.55; cursor:not-allowed; filter:grayscale(.3); }
+
+    /* Reduced motion: rispetta preferenze utente */
+    @media (prefers-reduced-motion: reduce){
+      .playing .bar, .spark, .egg, .miniAA, .chicken.breathe { animation: none !important }
+      .stage { transition: none !important }
     }
   </style>
 </head>
 <body>
+  <!-- SR live region per annunci -->
+  <div id="sr" aria-live="polite" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden"></div>
+
   <main class="hero">
     <section class="card" aria-labelledby="title">
       <span class="tag">TURN UP THE SCREECH</span>
@@ -205,7 +211,7 @@
       <div class="controls" id="controls">
         <button id="startBtn" class="btn">🔊 Start Beat</button>
         <button id="stopBtn"  class="btn" style="display:none">🛑 Stop</button>
-        <button id="eggBtn"   class="btn" title="Unleash the chaos">🥚💥 EGGSplosion</button>
+        <button id="eggBtn"   class="btn" title="Unleash the chaos" aria-live="polite">🥚💥 EGGSplosion</button>
       </div>
     </section>
   </main>
@@ -215,12 +221,12 @@
       <h3 style="font-family:'Bangers'; font-size:28px; margin:0 0 .25rem">INSERT $1</h3>
       <p style="margin:.25rem 0 .5rem"><strong>→ instant screech therapy.</strong></p>
       <a class="paybtn" href="?success=1#close" target="_self" rel="noopener">Pay with Stripe</a>
-      <a class="close" href="#">Cancel</a>
+      <a id="close" class="close" href="#">Cancel</a>
     </div>
   </div>
 
  <script>
-/* ===== AUDIO + VISUAL ENGINE — sync-lock + mobile clean ===== */
+/* ===== AUDIO + VISUAL ENGINE — sync-lock + mobile clean (patched) ===== */
 (function(){
   const stage    = document.getElementById('stage');
   const bar      = stage.querySelector('.bar');
@@ -230,20 +236,19 @@
   const eggBtn   = document.getElementById('eggBtn');
   const chicken  = stage.querySelector('.chicken');
   const crestEl  = stage.querySelector('.crest');
+  const srLive   = document.getElementById('sr');
 
   const IS_MOBILE = (('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0) ||
                     (window.matchMedia && window.matchMedia('(pointer:coarse)').matches));
 
-  /* -------- Profiles: desktop “brutale pulito” vs mobile “pulito massimo” -------- */
   const PROF = IS_MOBILE ? {
-    LOOKAHEAD: 0.28,              // audio scheduler anticipo
-    TICK_MS:   30,                // frequenza scheduler
-    VOICE_BUDGET: 34,             // budget totale voci (mobile)
-    EGG_POOL: 56,                 // più ampio per non “sparire”
+    LOOKAHEAD: 0.28,
+    TICK_MS:   30,
+    VOICE_BUDGET: 34,
+    EGG_POOL: 56,
     MINI_AA_COOLDOWN_MS: 80,
     SWING: 0.03,
-    // EGGSplosion (mobile, più safe)
-    BURST_COOLDOWN_MS: 4500,      // ricarica più lunga per evitare sovrapposizioni
+    BURST_COOLDOWN_MS: 4500,
     BURST_WAVES: 2,
     BURST_STEP: 0.022,
     BURST_EGGS_PER_WAVE: 14,
@@ -254,7 +259,6 @@
     EGG_POOL: 72,
     MINI_AA_COOLDOWN_MS: 34,
     SWING: 0.04,
-    // EGGSplosion (desktop, ignorante ma pulito)
     BURST_COOLDOWN_MS: 2400,
     BURST_WAVES: 4,
     BURST_STEP: 0.014,
@@ -276,7 +280,7 @@
     return ctx;
   }
 
-  // voice accounting corretto
+  // voice accounting
   let VOICES_NOW = 0;
   const inc=()=>{ VOICES_NOW++; };
   const dec=()=>{ VOICES_NOW = Math.max(0, VOICES_NOW-1); };
@@ -286,7 +290,8 @@
     try{ node.addEventListener?.('ended', tidy, {once:true}); }catch(e){}
     setTimeout(tidy, fallbackMs+30);
   }
-  const headroom = ()=> Math.max(0, PROF.VOICE_BUDGET - VOICES_NOW);
+  // leggermente più conservativo su mobile
+  function headroom(){ return Math.max(0, PROF.VOICE_BUDGET - VOICES_NOW - (IS_MOBILE?4:0)); }
 
   function mkWS(curveFn, n=4096){
     const c=ac(); const curve=new Float32Array(n);
@@ -298,7 +303,6 @@
     const c=ac();
     master = c.createGain();
 
-    // Mobile: meno drive, più headroom. Desktop: più spinta ma morbida.
     preSat = mkWS(x => Math.tanh((IS_MOBILE?7.5:9.5)*x));
     comp   = c.createDynamicsCompressor();
     comp.threshold.value = IS_MOBILE ? -14 : -12;
@@ -307,13 +311,11 @@
     comp.attack.value    = 0.004;
     comp.release.value   = 0.12;
 
-    // Post low-pass per togliere fruscio aspro su mobile, lascia aria su desktop
     postLP = c.createBiquadFilter();
     postLP.type='lowpass';
-    postLP.frequency.value = IS_MOBILE ? 3800 : 5200;
+    postLP.frequency.value = IS_MOBILE ? 3400 : 5200; // più safe su mobile
     postLP.Q.value = 0.5;
 
-    // Soft limiter (clipper morbido)
     softLim = mkWS(x => {
       const k=0.92; return Math.max(-k, Math.min(k, x));
     });
@@ -351,14 +353,11 @@
     if (!ctx) return; if (document.visibilityState==='visible' && ctx.state!=='running') ctx.resume?.();
   });
 
-  /* ---------------- VISUAL QUEUE (Audio-locked) ----------------
-     Tutte le animazioni visual vengono accodate con un time (ctx.currentTime).
-     Un loop RAF legge currentTime e spara gli eventi “due” → sync perfetto.  */
+  /* ---------------- VISUAL QUEUE ---------------- */
   const vq = []; // {t, fn}
-  function at(t, fn){ vq.push({t, fn}); } // schedule visual @ audio time
+  function at(t, fn){ vq.push({t, fn}); }
   function runVQ(){
     const c=ac(); const now=c.currentTime;
-    // esegui max 32 per frame per non bloccare
     let executed=0;
     for (let i=vq.length-1; i>=0 && executed<32; i--){
       if (vq[i].t <= now){
@@ -370,18 +369,20 @@
   }
   requestAnimationFrame(runVQ);
 
-  /* ---------------- Visual helpers (agganciati a VQ) ---------------- */
+  /* ---------------- Visual helpers ---------------- */
+  function announce(t){ srLive.textContent = t; }
   function setScream(on){
     stage.classList.toggle('scream', !!on);
     const shoutEl = stage.querySelector('.shout');
     if (shoutEl){ shoutEl.style.opacity = on ? '1' : '0'; shoutEl.style.transform='translateX(-50%)'; }
+    if (on) announce('Scream!');
   }
   function pulseWingAt(t){ at(t, ()=>{ stage.classList.add('beat'); setTimeout(()=>stage.classList.remove('beat'), 150); }); }
   function pumpChickenAt(t){ at(t, ()=>{ chicken.classList.remove('pump'); void chicken.offsetWidth; chicken.classList.add('pump'); crestEl?.classList.remove('bob'); void crestEl?.offsetWidth; crestEl?.classList.add('bob'); }); }
   function thumpAt(t){ at(t, ()=>{ stage.style.transform='scale(1.012)'; setTimeout(()=>stage.style.transform='scale(1)', 90); }); }
 
-  /* ---------------- Egg pool ---------------- */
-  const eggPool=[];
+  /* ---------------- Egg pool (round-robin) ---------------- */
+  const eggPool=[]; let eggIdx=0;
   function initEggPool(){
     if (eggPool.length) return;
     for (let i=0;i<PROF.EGG_POOL;i++){
@@ -391,12 +392,30 @@
     }
   }
   function getEgg(){
-    for (const e of eggPool) if (e.style.display==='none'){ e.style.display=''; return e; }
-    // Se tutte occupate, droppa visual meno importanti su mobile per restare fluidi
-    if (IS_MOBILE) return null;
-    const e=eggPool[0]; e.style.display=''; return e;
+    const N = eggPool.length;
+    for (let i=0;i<N; i++){
+      const e = eggPool[(eggIdx+i)%N];
+      if (e.style.display==='none'){ eggIdx = (eggIdx+i+1)%N; return e; }
+    }
+    // saturo: mobile -> nulla; desktop -> clone leggero
+    if (!IS_MOBILE){
+      const e=document.createElement('span');
+      e.className='egg'; e.textContent='🥚'; e.style.display='';
+      stage.appendChild(e);
+      return e;
+    }
+    return null;
   }
-  function releaseEgg(e){ if(!e) return; e.style.display='none'; e.textContent='🥚'; e.style.animation='none'; void e.offsetWidth; }
+  function releaseEgg(e){
+    if(!e) return;
+    e.style.display='none';
+    e.textContent='🥚';
+    e.style.animation='none';
+    e.style.left='0';
+    e.style.top='-44px';
+    e.style.transform='';
+    void e.offsetWidth;
+  }
 
   let lastAATime=0;
   function miniAAnear(e){
@@ -469,7 +488,6 @@
         track(o, len*1000);
       }
 
-      // noise layer
       if (headroom()>0){
         const n=c.createBufferSource(); n.buffer=NOISE_BUF;
         const nBP=c.createBiquadFilter(); nBP.type='bandpass'; nBP.frequency.value=2300; nBP.Q.value=6;
@@ -483,9 +501,9 @@
 
   /* ---------------- Eggs visual, audio-locked ---------------- */
   const LANES=[12,31,50,69,88];
-  function scheduleEgg(lanePct, t, hatchMode){ // t in audio time
+  function scheduleEgg(lanePct, t, hatchMode){
     at(t, ()=>{
-      const e=getEgg(); if(!e) return; // su mobile, se saturo, salta
+      const e=getEgg(); if(!e) return;
       const size=30+Math.round(Math.random()*8);
       e.style.fontSize=size+'px'; e.style.left=`calc(${lanePct}% - ${size/2}px)`;
       e.style.setProperty('--x', (Math.random()*8-4)+'px');
@@ -534,7 +552,7 @@
     return t+len;
   }
 
-  /* ---------------- Beat (2s) con variazioni leggere ---------------- */
+  /* ---------------- Beat (2s) ---------------- */
   let measureIdx=0;
   function scheduleMeasure(start,out){
     const dur=2.0, beat=0.5;
@@ -557,7 +575,6 @@
       const hatch2 = (Math.random()<0.20) ? (Math.random()<0.5?'air':'ground') : null;
       scheduleEgg([50,31,50,69][i], off, hatch2);
 
-      // mini AA legati all’off-beat (audio-locked)
       if (Math.random()<0.82) babyAA(off, out, {cluster: fillOn? (IS_MOBILE?1:3):(IS_MOBILE?1:2)});
     }
     if (fillOn){ const t=start+1.75; snare(t,out,false); hat(t+0.10,out,0.34,true); }
@@ -597,32 +614,72 @@
     }
   }
   function startLoop(){
+    if (isRunning) return; // guard atomico
     ensureMaster(); initEggPool(); isRunning=true; timelineEnd=0; measureIdx=0;
     if (schedTimer) clearInterval(schedTimer);
     schedTimer=setInterval(tick, PROF.TICK_MS);
     transient(1.03);
     bar.style.animation='none'; bar.offsetHeight; bar.style.animation=null;
     startBtn.style.display='none'; stopBtn.style.display='inline-block';
+    announce('Beat started');
   }
   function stopLoop(){
-    if (!isRunning) return; isRunning=false;
+    if (!isRunning) return;
+    isRunning=false;
     if (schedTimer){ clearInterval(schedTimer); schedTimer=null; }
+    vq.length = 0; // svuota la visual queue
     const c=ac(); const now=c.currentTime;
-    try{ master.gain.cancelScheduledValues(now); master.gain.setValueAtTime(master.gain.value, now); master.gain.linearRampToValueAtTime(0.0001, now+0.10); }catch(e){}
+    try{
+      master.gain.cancelScheduledValues(now);
+      master.gain.setValueAtTime(master.gain.value, now);
+      master.gain.linearRampToValueAtTime(0.0001, now+0.10);
+    }catch(e){}
     stage.classList.remove('playing'); setScream(false);
     startBtn.style.display='inline-block'; stopBtn.style.display='none';
+    announce('Beat stopped');
   }
 
-  /* ---------------- EGGSplosion (desktop brutale, mobile safe) ---------------- */
+  /* ---------------- EGGSplosion (duck dinamico + countdown aria) ---------------- */
   let burstLocked=false, queuedBursts=0;
-  function burst(){
-    const c=ensureMaster(); initEggPool();
-    duck(IS_MOBILE?0.84:0.80, IS_MOBILE?0.26:0.34);
+  function triggerBurst(){
+    if (burstLocked) return;
+    const hr = headroom();
+    const duckAmt = hr < 10 ? 0.78 : hr < 20 ? 0.82 : 0.86;
+    const hold   = hr < 10 ? 0.36 : 0.28;
+    duck(duckAmt, hold);
     transient(1.12);
 
+    burstLocked=true;
+    queuedBursts++;
+    requestAnimationFrame(burst);
+
+    // Countdown accessibile
+    eggBtn.disabled = true;
+    let left = Math.ceil(PROF.BURST_COOLDOWN_MS/1000);
+    const baseTxt = '🥚💥 EGGSplosion';
+    eggBtn.textContent = `${baseTxt} (${left})`;
+    eggBtn.setAttribute('aria-label', `EGGSplosion, disponibile tra ${left} secondi`);
+    const it = setInterval(()=>{
+      left--;
+      eggBtn.textContent = `${baseTxt} (${left})`;
+      eggBtn.setAttribute('aria-label', `EGGSplosion, disponibile tra ${left} secondi`);
+      if (left<=0){
+        clearInterval(it);
+        eggBtn.disabled=false;
+        eggBtn.textContent = baseTxt;
+        eggBtn.setAttribute('aria-label', 'EGGSplosion, pronto');
+      }
+    },1000);
+
+    setTimeout(()=>{ burstLocked=false; }, PROF.BURST_COOLDOWN_MS);
+  }
+
+  function burst(){
+    const c=ensureMaster(); initEggPool();
     const base=c.currentTime+0.02;
     const waves=PROF.BURST_WAVES, step=PROF.BURST_STEP;
     const eggsPer = PROF.BURST_EGGS_PER_WAVE + Math.min(queuedBursts,4)* (IS_MOBILE?3:5);
+    const LANES=[12,31,50,69,88];
 
     for (let w=0; w<waves; w++){
       const wBase = base + w*0.32;
@@ -639,33 +696,38 @@
     }
     queuedBursts=0;
   }
-  function triggerBurst(){
-    if (burstLocked) return;
-    burstLocked=true;
-    // UI countdown
-    if (eggBtn){
-      eggBtn.disabled=true;
-      const txt=eggBtn.textContent; let left=Math.ceil(PROF.BURST_COOLDOWN_MS/1000);
-      eggBtn.textContent=`🥚💥 EGGSplosion (${left})`;
-      const it=setInterval(()=>{ left--; eggBtn.textContent=`🥚💥 EGGSplosion (${left})`; if(left<=0){ clearInterval(it); eggBtn.disabled=false; eggBtn.textContent=txt; }},1000);
-    }
-    queuedBursts++; requestAnimationFrame(burst);
-    setTimeout(()=>{ burstLocked=false; }, PROF.BURST_COOLDOWN_MS);
-  }
 
-  /* ---------------- Wire buttons ---------------- */
+  /* ---------------- Wire buttons (mouse + tastiera) ---------------- */
   if (startBtn){
+    const keyProxy = el => e=>{ if (e.key==='Enter'||e.key===' ') { e.preventDefault(); el.click(); } };
     startBtn.addEventListener('pointerdown', startLoop, {passive:true});
     stopBtn .addEventListener('pointerdown',  stopLoop, {passive:true});
     eggBtn  .addEventListener('pointerdown',  triggerBurst, {passive:true});
+    startBtn.addEventListener('keydown', keyProxy(startBtn));
+    stopBtn .addEventListener('keydown', keyProxy(stopBtn));
+    eggBtn  .addEventListener('keydown', keyProxy(eggBtn));
     startBtn.addEventListener('pointerdown', ensureMaster, {passive:true, once:true});
     eggBtn  .addEventListener('pointerdown', ensureMaster, {passive:true, once:true});
   }
+
+  // unlock audio & start on first gesture
+  ['pointerdown','touchstart','keydown'].forEach(evt=>{
+    window.addEventListener(evt, ()=>{ ensureMaster(); }, { once:true, passive:true });
+  });
+
+  // Modale: chiusura pulita su #close
+  window.addEventListener('hashchange', ()=>{
+    if (location.hash==='#close'){
+      history.replaceState(null,'', location.pathname + location.search);
+    }
+  });
 })();
 </script>
 
 </body>
 </html>
+
+
 
 
 
